@@ -10,8 +10,8 @@ from langgraph.graph import StateGraph, END, START
 # =====================================================================
 # 1. MODEL CONFIGURATION
 # =====================================================================
-# Swapped to Haiku to resolve the Tier 1 API account 404 permissions issue
-MODEL_NAME = "claude-3-5-haiku-20241022"
+# Swapped to baseline Claude 3 Haiku to guarantee universal tier access
+MODEL_NAME = "claude-3-haiku-20240307"
 
 # =====================================================================
 # 2. DATA MODELS & STATE SETUP
@@ -140,18 +140,17 @@ def main():
     builder.add_node("style_agent", style_agent)
     builder.add_node("synthesizer", synthesizer_node)
     
-    # Connect START to parallel nodes
+    # Parallel fan-out routing
     builder.add_edge(START, "security_agent")
     builder.add_edge(START, "bug_hunter_agent")
     builder.add_edge(START, "style_agent")
     
-    # Route edge aggregations downstream
+    # Fan-in down stream collection
     builder.add_edge("security_agent", "synthesizer")
     builder.add_edge("bug_hunter_agent", "synthesizer")
     builder.add_edge("style_agent", "synthesizer")
     builder.add_edge("synthesizer", END)
     
-    # Compile Graph
     graph = builder.compile()
     
     initial_state = {
