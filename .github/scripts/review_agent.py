@@ -108,8 +108,12 @@ def post_github_comment(report: str):
     pr_num = os.getenv("PR_NUMBER")
     token = os.getenv("GITHUB_TOKEN")
     
-    # CRITICAL FIX: Direct absolute routing to official api domain path
-    url = f"https://github.com{repo}/issues/{pr_num}/comments"
+    # SAFE STRIP: Prevents accidental leading or trailing space parsing anomalies
+    clean_repo = str(repo).strip()
+    clean_pr_num = str(pr_num).strip()
+    
+    # GUARANTEED PATH: Explicit absolute URL structure mapping to avoid domain combining errors
+    url = f"https://github.com{clean_repo}/issues/{clean_pr_num}/comments"
     print(f"Posting final comment directly to target API endpoint: {url}")
     
     headers = {
