@@ -37,11 +37,13 @@ def get_pr_diff() -> str:
     token = os.getenv("GITHUB_TOKEN")
     
     if not all([repo, pr_num, token]):
-        print("Missing required environment variables.")
+        print("Error: Missing required environment variables (REPO_NAME, PR_NUMBER, or GITHUB_TOKEN).")
         sys.exit(1)
         
-    # FIX: Explicit full API base domain path
+    # Hardcoded base structure ensures zero parsing domain string errors
     url = f"https://github.com{repo}/pulls/{pr_num}"
+    print(f"Requesting PR Diff via direct target endpoint: {url}")
+    
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3.diff"
@@ -116,7 +118,6 @@ def post_github_comment(report: str):
     pr_num = os.getenv("PR_NUMBER")
     token = os.getenv("GITHUB_TOKEN")
     
-    # FIX: Explicit full API base domain path
     url = f"https://github.com{repo}/issues/{pr_num}/comments"
     headers = {
         "Authorization": f"token {token}",
