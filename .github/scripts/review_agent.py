@@ -104,17 +104,18 @@ def synthesizer_node(state: ReviewState) -> Dict:
 
 def post_github_comment(report: str):
     """Sends the consolidated review dashboard back to the active pull request pipeline."""
-    repo = os.getenv("REPO_NAME")
-    pr_num = os.getenv("PR_NUMBER")
+    raw_repo = os.getenv("REPO_NAME", "")
+    pr_num = os.getenv("PR_NUMBER", "").strip()
     token = os.getenv("GITHUB_TOKEN")
     
-    # SAFE STRIP: Prevents accidental leading or trailing space parsing anomalies
-    clean_repo = str(repo).strip()
-    clean_pr_num = str(pr_num).strip()
-    
-    # GUARANTEED PATH: Explicit absolute URL structure mapping to avoid domain combining errors
-    url = f"https://github.com{clean_repo}/issues/{clean_pr_num}/comments"
-    print(f"Posting final comment directly to target API endpoint: {url}")
+    # FIX: Strips out domain strings if embedded inside the environment payload
+    clean_repo = raw_repo.replace("https://", "").replace("http://", "").replace("github.com", "").strip()
+    # Removes any accidental leading slashes left over from string filtering
+    if clean_repo.startswith("/"):
+        clean_repo = clean_repo[1:]
+        
+    url = f"https://github.com{clean_repo}/issues/{pr_num}/comments"
+    print(f"Sanitized Target API URL: {url}")
     
     headers = {
         "Authorization": f"token {token}",
