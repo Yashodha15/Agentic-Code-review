@@ -50,7 +50,6 @@ def get_pr_diff() -> str:
 # =====================================================================
 
 def security_agent(state: ReviewState) -> Dict:
-    # FIX: Removed temperature argument to support modern model constraints
     llm = ChatAnthropic(model=MODEL_NAME).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Security Sentinel. Analyze this git diff for vulnerabilities, "
@@ -61,7 +60,6 @@ def security_agent(state: ReviewState) -> Dict:
     return {"security_findings": [f.model_dump() for f in result.findings]}
 
 def bug_hunter_agent(state: ReviewState) -> Dict:
-    # FIX: Removed temperature argument to support modern model constraints
     llm = ChatAnthropic(model=MODEL_NAME).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Bug Hunter. Analyze this git diff for logical flaws, "
@@ -72,7 +70,6 @@ def bug_hunter_agent(state: ReviewState) -> Dict:
     return {"bug_findings": [f.model_dump() for f in result.findings]}
 
 def style_agent(state: ReviewState) -> Dict:
-    # FIX: Removed temperature argument to support modern model constraints
     llm = ChatAnthropic(model=MODEL_NAME).with_structured_output(AgentOutput)
     prompt = (
         "You are a Style and Pattern Architect. Analyze this git diff for readability, "
@@ -80,14 +77,14 @@ def style_agent(state: ReviewState) -> Dict:
         f"Diff:\n{state['diff']}"
     )
     result = llm.invoke(prompt)
-    return {"style_findings": [f.model_dump() for m in result.findings]}
+    # FIX: Corrected iteration loop variable naming mismatch (m -> f)
+    return {"style_findings": [f.model_dump() for f in result.findings]}
 
 # =====================================================================
 # 5. SYNTHESIZER NODE & GITHUB OUTPUT
 # =====================================================================
 
 def synthesizer_node(state: ReviewState) -> Dict:
-    # FIX: Removed temperature argument to support modern model constraints
     llm = ChatAnthropic(model=MODEL_NAME)
     
     all_findings = {
@@ -143,12 +140,10 @@ def main():
     builder.add_node("style_agent", style_agent)
     builder.add_node("synthesizer", synthesizer_node)
     
-    # Establish entry point parallel loops
     builder.add_edge(START, "security_agent")
     builder.add_edge(START, "bug_hunter_agent")
     builder.add_edge(START, "style_agent")
     
-    # Route back down to fan-in aggregator
     builder.add_edge("security_agent", "synthesizer")
     builder.add_edge("bug_hunter_agent", "synthesizer")
     builder.add_edge("style_agent", "synthesizer")
