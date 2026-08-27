@@ -45,7 +45,7 @@ def get_pr_diff() -> str:
 # =====================================================================
 
 def security_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Security Sentinel. Analyze this git diff for vulnerabilities, "
         "hardcoded secrets, injection flaws, or improper error handling that leaks data.\n\n"
@@ -55,7 +55,7 @@ def security_agent(state: ReviewState) -> Dict:
     return {"security_findings": [f.model_dump() for f in result.findings]}
 
 def bug_hunter_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Bug Hunter. Analyze this git diff for logical flaws, "
         "race conditions, edge cases, null pointer exceptions, or off-by-one errors.\n\n"
@@ -65,7 +65,7 @@ def bug_hunter_agent(state: ReviewState) -> Dict:
     return {"bug_findings": [f.model_dump() for f in result.findings]}
 
 def style_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are a Style and Pattern Architect. Analyze this git diff for readability, "
         "naming consistency, missing documentation, or violations of clean code standards.\n\n"
@@ -79,7 +79,7 @@ def style_agent(state: ReviewState) -> Dict:
 # =====================================================================
 
 def synthesizer_node(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0.2)
+    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.2)
     
     all_findings = {
         "Security": state.get("security_findings", []),
