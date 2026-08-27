@@ -5,9 +5,12 @@ import requests
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from langchain_anthropic import ChatAnthropic
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
 
-# Data Models
+# =====================================================================
+# 1. DATA MODELS & STATE SETUP
+# =====================================================================
+
 class ReviewFinding(BaseModel):
     line: int = Field(description="The specific line number in the diff where the issue occurs.")
     category: str = Field(description="Category of the finding: 'Security', 'Bug', or 'Style'")
@@ -23,6 +26,10 @@ class ReviewState(Dict[str, Any]):
     style_findings: List[Dict]
     final_report: str
 
+# =====================================================================
+# 2. GITHUB CONTEXT UTILITIES
+# =====================================================================
+
 def get_pr_diff() -> str:
     """Reads the pre-downloaded local git diff text file."""
     if not os.path.exists("pr_diff.txt"):
@@ -33,7 +40,10 @@ def get_pr_diff() -> str:
         content = f.read()
     return content
 
-# Sub-Agent Nodes
+# =====================================================================
+# 3. SPECIALIZED SUB-AGENT NODES
+# =====================================================================
+
 def security_agent(state: ReviewState) -> Dict:
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
     prompt = (
@@ -64,6 +74,10 @@ def style_agent(state: ReviewState) -> Dict:
     result = llm.invoke(prompt)
     return {"style_findings": [f.model_dump() for f in result.findings]}
 
+# =====================================================================
+# 4. SYNTHESIZER NODE & GITHUB OUTPUT
+# =====================================================================
+
 def synthesizer_node(state: ReviewState) -> Dict:
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0.2)
     
@@ -89,7 +103,6 @@ def post_github_comment(report: str):
     pr_num = os.getenv("PR_NUMBER")
     token = os.getenv("GITHUB_TOKEN")
     
-    # Corrected API target endpoint structure
     url = f"https://github.com{repo}/issues/{pr_num}/comments"
     print(f"Posting final comment to: {url}")
     
@@ -105,6 +118,10 @@ def post_github_comment(report: str):
     else:
         print(f"Failed to post comment to GitHub API (Status {res.status_code}): {res.text}")
 
+# =====================================================================
+# 5. ORCHESTRATION PIPELINE DEFINITION
+# =====================================================================
+
 def main():
     diff_content = get_pr_diff()
     if not diff_content.strip():
@@ -117,13 +134,20 @@ def main():
     builder.add_node("style_agent", style_agent)
     builder.add_node("synthesizer", synthesizer_node)
     
-    builder.set_entry_point(["security_agent", "bug_hunter_agent", "style_agent"])
+    # Correct parallel fan-out entry routing using START edge loops
+    builder.add_edge(START, "security_agent")
+    builder.add_edge(START, "bug_hunter_agent")
+    builder.add_edge(START, "style_agent")
+    
+    # Map Async Fan-In collection limits down to the Synthesizer
     builder.add_edge("security_agent", "synthesizer")
     builder.add_edge("bug_hunter_agent", "synthesizer")
     builder.add_edge("style_agent", "synthesizer")
     builder.add_edge("synthesizer", END)
     
+    # Build System State Machines
     graph = builder.compile()
+    
     initial_state = {
         "diff": diff_content,
         "security_findings": [],
