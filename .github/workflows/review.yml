@@ -26,6 +26,14 @@ jobs:
         run: |
           pip install langchain-anthropic langgraph pydantic requests
 
+      - name: Download PR Diff Text File
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github.v3.diff" \
+               "${{ github.event.pull_request.url }}" > pr_diff.txt
+
       - name: Run Multi-Agent Reviewer
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

@@ -7,10 +7,7 @@ from pydantic import BaseModel, Field
 from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END
 
-# =====================================================================
-# 1. DATA MODELS & STATE SETUP
-# =====================================================================
-
+# Data Models
 class ReviewFinding(BaseModel):
     line: int = Field(description="The specific line number in the diff where the issue occurs.")
     category: str = Field(description="Category of the finding: 'Security', 'Bug', or 'Style'")
@@ -26,39 +23,17 @@ class ReviewState(Dict[str, Any]):
     style_findings: List[Dict]
     final_report: str
 
-# =====================================================================
-# 2. GITHUB CONTEXT UTILITIES (FIXED URL PATHS)
-# =====================================================================
-
 def get_pr_diff() -> str:
-    """Fetches the raw git diff text for the target pull request."""
-    repo = os.getenv("REPO_NAME")
-    pr_num = os.getenv("PR_NUMBER")
-    token = os.getenv("GITHUB_TOKEN")
-    
-    if not all([repo, pr_num, token]):
-        print("Error: Missing required environment variables (REPO_NAME, PR_NUMBER, or GITHUB_TOKEN).")
+    """Reads the pre-downloaded local git diff text file."""
+    if not os.path.exists("pr_diff.txt"):
+        print("Error: pr_diff.txt not found locally!")
         sys.exit(1)
         
-    # Hardcoded base structure ensures zero parsing domain string errors
-    url = f"https://github.com{repo}/pulls/{pr_num}"
-    print(f"Requesting PR Diff via direct target endpoint: {url}")
-    
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3.diff"
-    }
-    
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        print(f"Failed to fetch diff from GitHub API: {response.text}")
-        sys.exit(1)
-    return response.text
+    with open("pr_diff.txt", "r", encoding="utf-8") as f:
+        content = f.read()
+    return content
 
-# =====================================================================
-# 3. SPECIALIZED SUB-AGENT NODES
-# =====================================================================
-
+# Sub-Agent Nodes
 def security_agent(state: ReviewState) -> Dict:
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
     prompt = (
@@ -89,10 +64,6 @@ def style_agent(state: ReviewState) -> Dict:
     result = llm.invoke(prompt)
     return {"style_findings": [f.model_dump() for f in result.findings]}
 
-# =====================================================================
-# 4. SYNTHESIZER NODE & GITHUB OUTPUT
-# =====================================================================
-
 def synthesizer_node(state: ReviewState) -> Dict:
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0.2)
     
@@ -118,7 +89,10 @@ def post_github_comment(report: str):
     pr_num = os.getenv("PR_NUMBER")
     token = os.getenv("GITHUB_TOKEN")
     
+    # Corrected API target endpoint structure
     url = f"https://github.com{repo}/issues/{pr_num}/comments"
+    print(f"Posting final comment to: {url}")
+    
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
@@ -129,11 +103,7 @@ def post_github_comment(report: str):
     if res.status_code == 201:
         print("Successfully posted multi-agent review to GitHub!")
     else:
-        print(f"Failed to post comment to GitHub API: {res.text}")
-
-# =====================================================================
-# 5. ORCHESTRATION PIPELINE DEFINITION
-# =====================================================================
+        print(f"Failed to post comment to GitHub API (Status {res.status_code}): {res.text}")
 
 def main():
     diff_content = get_pr_diff()
