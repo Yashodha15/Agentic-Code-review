@@ -8,9 +8,8 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END, START
 
 # =====================================================================
-# 1. VERIFIED MODEL CONFIGURATION
+# 1. MODEL CONFIGURATION
 # =====================================================================
-# Configured explicitly to match your verified account capacity
 MODEL_NAME = "claude-sonnet-5"
 
 # =====================================================================
@@ -51,7 +50,8 @@ def get_pr_diff() -> str:
 # =====================================================================
 
 def security_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model=MODEL_NAME, temperature=0).with_structured_output(AgentOutput)
+    # FIX: Removed temperature argument to support modern model constraints
+    llm = ChatAnthropic(model=MODEL_NAME).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Security Sentinel. Analyze this git diff for vulnerabilities, "
         "hardcoded secrets, injection flaws, or improper error handling that leaks data.\n\n"
@@ -61,7 +61,8 @@ def security_agent(state: ReviewState) -> Dict:
     return {"security_findings": [f.model_dump() for f in result.findings]}
 
 def bug_hunter_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model=MODEL_NAME, temperature=0).with_structured_output(AgentOutput)
+    # FIX: Removed temperature argument to support modern model constraints
+    llm = ChatAnthropic(model=MODEL_NAME).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Bug Hunter. Analyze this git diff for logical flaws, "
         "race conditions, edge cases, null pointer exceptions, or off-by-one errors.\n\n"
@@ -71,21 +72,23 @@ def bug_hunter_agent(state: ReviewState) -> Dict:
     return {"bug_findings": [f.model_dump() for f in result.findings]}
 
 def style_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model=MODEL_NAME, temperature=0).with_structured_output(AgentOutput)
+    # FIX: Removed temperature argument to support modern model constraints
+    llm = ChatAnthropic(model=MODEL_NAME).with_structured_output(AgentOutput)
     prompt = (
         "You are a Style and Pattern Architect. Analyze this git diff for readability, "
         "naming consistency, missing documentation, or violations of clean code standards.\n\n"
         f"Diff:\n{state['diff']}"
     )
     result = llm.invoke(prompt)
-    return {"style_findings": [f.model_dump() for f in result.findings]}
+    return {"style_findings": [f.model_dump() for m in result.findings]}
 
 # =====================================================================
 # 5. SYNTHESIZER NODE & GITHUB OUTPUT
 # =====================================================================
 
 def synthesizer_node(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model=MODEL_NAME, temperature=0.2)
+    # FIX: Removed temperature argument to support modern model constraints
+    llm = ChatAnthropic(model=MODEL_NAME)
     
     all_findings = {
         "Security": state.get("security_findings", []),
@@ -116,7 +119,7 @@ def post_github_comment(report: str):
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
-    body = {"body": f"### 🤖 Multi-Agent AI Code Review Report (Claude 5)\n\n{report}"}
+    body = {"body": f"### 🤖 Multi-Agent AI Code Review Report\n\n{report}"}
     
     res = requests.post(url, headers=headers, json=body)
     if res.status_code == 201:
