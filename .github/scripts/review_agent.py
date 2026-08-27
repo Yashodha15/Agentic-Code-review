@@ -40,7 +40,7 @@ def get_pr_diff() -> str:
         print("Missing required environment variables (REPO_NAME, PR_NUMBER, or GITHUB_TOKEN).")
         sys.exit(1)
         
-    url = f"https://github.com/{repo}/pulls/{pr_num}"
+    url = f"https://github.com{repo}/pulls/{pr_num}"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3.diff"
