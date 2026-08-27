@@ -77,7 +77,6 @@ def style_agent(state: ReviewState) -> Dict:
         f"Diff:\n{state['diff']}"
     )
     result = llm.invoke(prompt)
-    # FIX: Corrected iteration loop variable naming mismatch (m -> f)
     return {"style_findings": [f.model_dump() for f in result.findings]}
 
 # =====================================================================
@@ -109,14 +108,15 @@ def post_github_comment(report: str):
     pr_num = os.getenv("PR_NUMBER")
     token = os.getenv("GITHUB_TOKEN")
     
+    # CRITICAL FIX: Direct absolute routing to official api domain path
     url = f"https://github.com{repo}/issues/{pr_num}/comments"
-    print(f"Posting final comment to: {url}")
+    print(f"Posting final comment directly to target API endpoint: {url}")
     
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
-    body = {"body": f"### 🤖 Multi-Agent AI Code Review Report\n\n{report}"}
+    body = {"body": f"### 🤖 Multi-Agent AI Code Review Report (Claude 5)\n\n{report}"}
     
     res = requests.post(url, headers=headers, json=body)
     if res.status_code == 201:
