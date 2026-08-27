@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import requests
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from langchain_anthropic import ChatAnthropic
@@ -80,7 +79,7 @@ def style_agent(state: ReviewState) -> Dict:
     return {"style_findings": [f.model_dump() for f in result.findings]}
 
 # =====================================================================
-# 5. SYNTHESIZER NODE & GITHUB OUTPUT
+# 5. SYNTHESIZER NODE & FILE OUTPUT
 # =====================================================================
 
 def synthesizer_node(state: ReviewState) -> Dict:
@@ -102,32 +101,11 @@ def synthesizer_node(state: ReviewState) -> Dict:
     response = llm.invoke(prompt)
     return {"final_report": response.content}
 
-def post_github_comment(report: str):
-    """Sends the consolidated review dashboard back to the active pull request pipeline."""
-    raw_repo = os.getenv("REPO_NAME", "")
-    pr_num = os.getenv("PR_NUMBER", "").strip()
-    token = os.getenv("GITHUB_TOKEN")
-    
-    # FIX: Strips out domain strings if embedded inside the environment payload
-    clean_repo = raw_repo.replace("https://", "").replace("http://", "").replace("github.com", "").strip()
-    # Removes any accidental leading slashes left over from string filtering
-    if clean_repo.startswith("/"):
-        clean_repo = clean_repo[1:]
-        
-    url = f"https://github.com{clean_repo}/issues/{pr_num}/comments"
-    print(f"Sanitized Target API URL: {url}")
-    
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    body = {"body": f"### 🤖 Multi-Agent AI Code Review Report (Claude 5)\n\n{report}"}
-    
-    res = requests.post(url, headers=headers, json=body)
-    if res.status_code == 201:
-        print("Successfully posted multi-agent review to GitHub!")
-    else:
-        print(f"Failed to post comment to GitHub API (Status {res.status_code}): {res.text}")
+def save_report_locally(report: str):
+    """Saves report cleanly to a local workspace file to avoid network parsing bugs."""
+    with open("final_report.md", "w", encoding="utf-8") as f:
+        f.write(f"### 🤖 Multi-Agent AI Code Review Report (Claude 5)\n\n{report}")
+    print("Successfully compiled and saved review markdown locally!")
 
 # =====================================================================
 # 6. ORCHESTRATION PIPELINE DEFINITION
@@ -166,8 +144,7 @@ def main():
     
     print(f"Initiating execution using verified model: {MODEL_NAME}...")
     final_output = graph.invoke(initial_state)
-    print("Publishing report findings...")
-    post_github_comment(final_output["final_report"])
+    save_report_locally(final_output["final_report"])
 
 if __name__ == "__main__":
     main()

@@ -37,7 +37,11 @@ jobs:
       - name: Run Multi-Agent Reviewer
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO_NAME: ${{ github.repository }}
         run: python .github/scripts/review_agent.py
+
+      - name: Post Comment via Native GitHub CLI
+        if: success() && hashFiles('final_report.md') != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file final_report.md
