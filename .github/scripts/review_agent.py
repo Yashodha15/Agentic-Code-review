@@ -10,9 +10,8 @@ from langgraph.graph import StateGraph, END, START
 # =====================================================================
 # 1. MODEL CONFIGURATION
 # =====================================================================
-# If your API account fails on sonnet-20241022, you can change this to 
-# "claude-3-opus-20240229" or "claude-3-haiku-20240307"
-MODEL_NAME = "claude-3-5-sonnet-20241022"
+# Swapped to Haiku to resolve the Tier 1 API account 404 permissions issue
+MODEL_NAME = "claude-3-5-haiku-20241022"
 
 # =====================================================================
 # 2. DATA MODELS & STATE SETUP
