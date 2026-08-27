@@ -7,7 +7,7 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END, START
 
 # =====================================================================
-# 1. VERIFIED MODEL CONFIGURATION
+# 1. MODEL CONFIGURATION
 # =====================================================================
 MODEL_NAME = "claude-sonnet-5"
 
@@ -55,7 +55,6 @@ def get_pr_diff() -> str:
 
 def security_agent(state: ReviewState) -> Dict:
     """Scans the codebase changes specifically looking for security leaks and safety anomalies."""
-    # Added zero-temperature initialization via specific parameters to fix data serialization artifacts
     llm = ChatAnthropic(model=MODEL_NAME, default_request_timeout=60.0).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Security Sentinel. Analyze this git diff for vulnerabilities, "
@@ -114,14 +113,23 @@ def synthesizer_node(state: ReviewState) -> Dict:
     response = llm.invoke(prompt)
     return {"final_report": response.content}
 
-def save_report_locally(report: str):
-    """Writes the finalized markdown output report straight to a local file asset."""
-    if not report or not report.strip():
+def save_report_locally(report: Any):
+    """Writes the finalized markdown output report straight to a local file asset safely handling type casting."""
+    # FIX: Cleanly unpack the data block if LangGraph returns it nested inside a list array object
+    if isinstance(report, list):
+        if len(report) > 0:
+            clean_text = str(report[-1]).strip()
+        else:
+            clean_text = ""
+    else:
+        clean_text = str(report).strip() if report else ""
+        
+    if not clean_text:
         print("Warning: The generated code review report stream was completely empty.")
         return
         
     with open("final_report.md", "w", encoding="utf-8") as f:
-        f.write(f"{report}")
+        f.write(clean_text)
     print("Successfully compiled and saved review markdown locally!")
 
 # =====================================================================
@@ -164,7 +172,7 @@ def main():
     try:
         final_output = graph.invoke(initial_state)
         print("Execution complete. Processing file outputs...")
-        save_report_locally(final_output["final_report"])
+        save_report_locally(final_output.get("final_report", ""))
     except Exception as e:
         print(f"Runtime execution block exception error: {str(e)}")
         sys.exit(1)
