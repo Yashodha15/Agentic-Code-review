@@ -1,14 +1,14 @@
 import os
 import sys
 import json
-import requests
+import subprocess
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END, START
 
 # =====================================================================
-# 1. ARCHITECTURE CONFIGURATION
+# 1. MODEL CONFIGURATION
 # =====================================================================
 MODEL_NAME = "claude-sonnet-5"
 
@@ -95,7 +95,7 @@ def style_agent(state: ReviewState) -> Dict:
     return {"style_findings": [f.model_dump() for f in result.findings]}
 
 # =====================================================================
-# 5. SYNTHESIZER NODE & DIRECT API PUBLISHING
+# 5. SYNTHESIZER NODE & FILE GENERATION
 # =====================================================================
 
 def synthesizer_node(state: ReviewState) -> Dict:
@@ -120,11 +120,7 @@ def synthesizer_node(state: ReviewState) -> Dict:
     return {"final_findings": [f.model_dump() for f in result.findings]}
 
 def post_github_inline_review(findings: List[Dict]):
-    """Sends the collection of comments directly onto target line locations via the Pull Request Review API."""
-    pr_num = os.getenv("PR_NUMBER", "").strip()
-    token = os.getenv("GITHUB_TOKEN")
-    commit_id = os.getenv("COMMIT_SHA", "").strip()
-    
+    """Saves the review findings directly to a local JSON payload file to bypass Python network bugs."""
     if not findings:
         print("🎉 No code quality issues found across agents! Code looks great.")
         return
@@ -138,26 +134,16 @@ def post_github_inline_review(findings: List[Dict]):
             "side": "RIGHT"
         })
 
-    # ABSOLUTE FIX: Hardcoded clean api.github.com base domain layout string string literal
-    review_url = f"https://github.com{pr_num}/reviews"
-    print(f"Targeting Absolute API Review Endpoint URL: {review_url}")
-    
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    
     review_body = {
-        "commit_id": commit_id,
+        "commit_id": os.getenv("COMMIT_SHA", "").strip(),
         "event": "COMMENT",
         "comments": comments_payload
     }
     
-    res = requests.post(review_url, headers=headers, json=review_body)
-    if res.status_code == 201:
-        print("Successfully posted inline code review comments!")
-    else:
-        print(f"Failed to post inline review comments (Status {res.status_code}): {res.text}")
+    # Save payload locally
+    with open("review_payload.json", "w", encoding="utf-8") as f:
+        json.dump(review_body, f, indent=2)
+    print("Successfully exported review findings payload locally!")
 
 # =====================================================================
 # 6. ORCHESTRATION PIPELINE DEFINITION

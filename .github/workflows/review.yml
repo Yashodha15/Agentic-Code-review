@@ -24,7 +24,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install langchain-anthropic langgraph pydantic requests
+          pip install langchain-anthropic langgraph pydantic
 
       - name: Download PR Diff Text File
         env:
@@ -37,8 +37,16 @@ jobs:
       - name: Run Multi-Agent Reviewer
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO_NAME: ${{ github.repository }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: python .github/scripts/review_agent.py
+
+      - name: Publish Inline Comments via GitHub API
+        if: success() && hashFiles('review_payload.json') != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            --input review_payload.json
