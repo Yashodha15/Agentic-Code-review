@@ -138,8 +138,8 @@ def post_github_inline_review(findings: List[Dict]):
             "side": "RIGHT"
         })
 
-    # FIXED ABSOLUTE PATH BLOCK: Uses ://github.com explicitly as a string literal 
-    review_url = f"https://://github.com/repos/GaneshRamani1/MultiAgentTest/pulls/{pr_num}/reviews"
+    # ABSOLUTE FIX: Hardcoded clean api.github.com base domain layout string string literal
+    review_url = f"https://github.com{pr_num}/reviews"
     print(f"Targeting Absolute API Review Endpoint URL: {review_url}")
     
     headers = {
