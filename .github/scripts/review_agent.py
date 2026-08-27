@@ -8,9 +8,10 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END, START
 
 # =====================================================================
-# 1. MODEL CONFIGURATION
+# 1. ARCHITECTURE CONFIGURATION
 # =====================================================================
 MODEL_NAME = "claude-sonnet-5"
+TARGET_REPOSITORY = "GaneshRamani1/MultiAgentTest"  # Hardcoded target to eliminate parsing bugs
 
 # =====================================================================
 # 2. DATA MODELS & STATE SETUP
@@ -121,25 +122,10 @@ def synthesizer_node(state: ReviewState) -> Dict:
 
 def post_github_inline_review(findings: List[Dict]):
     """Sends the collection of comments directly onto target line locations via the Pull Request Review API."""
-    raw_repo = os.getenv("REPO_NAME", "")
     pr_num = os.getenv("PR_NUMBER", "").strip()
     token = os.getenv("GITHUB_TOKEN")
     commit_id = os.getenv("COMMIT_SHA", "").strip()
     
-    # ADVANCED SANITIZATION: Forces separation using standard forward slash split arrays
-    # This filters out 'github.comganeshramani1' anomalies completely
-    parts = [p for p in raw_repo.split('/') if p.strip()]
-    
-    # If the environment string mashed 'github.com' with the user name (e.g. 'github.comganeshramani1')
-    # we isolate the username by stripping the domain head explicitly
-    if len(parts) >= 2:
-        user_part = parts[-2].lower().replace("github.com", "")
-        repo_part = parts[-1]
-        clean_repo = f"{user_part}/{repo_part}"
-    else:
-        # Fallback to direct absolute parameter parsing
-        clean_repo = "GaneshRamani1/MultiAgentTest"
-
     if not findings:
         print("🎉 No code quality issues found across agents! Code looks great.")
         return
@@ -153,8 +139,8 @@ def post_github_inline_review(findings: List[Dict]):
             "side": "RIGHT"
         })
 
-    # HARDCODED ENDPOINT BASE Domain to stop parsing variations completely
-    review_url = f"https://github.com{clean_repo}/pulls/{pr_num}/reviews"
+    # Hardcoded to official api domain path using TARGET_REPOSITORY
+    review_url = f"https://github.com{TARGET_REPOSITORY}/pulls/{pr_num}/reviews"
     print(f"Targeting Absolute API Review Endpoint URL: {review_url}")
     
     headers = {
@@ -211,7 +197,6 @@ def main():
         final_output = graph.invoke(initial_state)
         target_findings = final_output.get("final_findings", [])
         
-        # Handle dictionary aggregation unpacked from state lists
         if isinstance(target_findings, list) and len(target_findings) > 0:
             if isinstance(target_findings[-1], list):
                 target_findings = target_findings[-1]
