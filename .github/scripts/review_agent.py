@@ -11,7 +11,6 @@ from langgraph.graph import StateGraph, END, START
 # 1. ARCHITECTURE CONFIGURATION
 # =====================================================================
 MODEL_NAME = "claude-sonnet-5"
-TARGET_REPOSITORY = "GaneshRamani1/MultiAgentTest"  # Hardcoded target to eliminate parsing bugs
 
 # =====================================================================
 # 2. DATA MODELS & STATE SETUP
@@ -139,8 +138,8 @@ def post_github_inline_review(findings: List[Dict]):
             "side": "RIGHT"
         })
 
-    # Hardcoded to official api domain path using TARGET_REPOSITORY
-    review_url = f"https://github.com{TARGET_REPOSITORY}/pulls/{pr_num}/reviews"
+    # FIXED ABSOLUTE PATH BLOCK: Uses ://github.com explicitly as a string literal 
+    review_url = f"https://://github.com/repos/GaneshRamani1/MultiAgentTest/pulls/{pr_num}/reviews"
     print(f"Targeting Absolute API Review Endpoint URL: {review_url}")
     
     headers = {
