@@ -100,7 +100,6 @@ def style_agent(state: ReviewState) -> Dict:
 
 def synthesizer_node(state: ReviewState) -> Dict:
     """Aggregates, deduplicates, and compiles all raw sub-agent states into an array schema."""
-    # We leverage structured outputs here to guarantee python gets an aggregate clean dataset array back
     llm = ChatAnthropic(model=MODEL_NAME, default_request_timeout=60.0).with_structured_output(AgentOutput)
     
     all_findings = {
@@ -122,30 +121,42 @@ def synthesizer_node(state: ReviewState) -> Dict:
 
 def post_github_inline_review(findings: List[Dict]):
     """Sends the collection of comments directly onto target line locations via the Pull Request Review API."""
-    repo = os.getenv("REPO_NAME", "")
+    raw_repo = os.getenv("REPO_NAME", "")
     pr_num = os.getenv("PR_NUMBER", "").strip()
     token = os.getenv("GITHUB_TOKEN")
     commit_id = os.getenv("COMMIT_SHA", "").strip()
     
-    clean_repo = repo.replace("https://", "").replace("http://", "").replace("github.com", "").strip()
-    if clean_repo.startswith("/"):
-        clean_repo = clean_repo[1:]
-        
+    # ADVANCED SANITIZATION: Forces separation using standard forward slash split arrays
+    # This filters out 'github.comganeshramani1' anomalies completely
+    parts = [p for p in raw_repo.split('/') if p.strip()]
+    
+    # If the environment string mashed 'github.com' with the user name (e.g. 'github.comganeshramani1')
+    # we isolate the username by stripping the domain head explicitly
+    if len(parts) >= 2:
+        user_part = parts[-2].lower().replace("github.com", "")
+        repo_part = parts[-1]
+        clean_repo = f"{user_part}/{repo_part}"
+    else:
+        # Fallback to direct absolute parameter parsing
+        clean_repo = "GaneshRamani1/MultiAgentTest"
+
     if not findings:
         print("🎉 No code quality issues found across agents! Code looks great.")
         return
 
-    # Construct the payload format expected by GitHub's /reviews API endpoint
     comments_payload = []
     for f in findings:
         comments_payload.append({
             "path": f["path"].strip(),
             "line": int(f["line"]),
             "body": f"### 🤖 AI [{f['category']}]\n{f['comment']}",
-            "side": "RIGHT" # Targets the updated code lines rather than left-side base histories
+            "side": "RIGHT"
         })
 
+    # HARDCODED ENDPOINT BASE Domain to stop parsing variations completely
     review_url = f"https://github.com{clean_repo}/pulls/{pr_num}/reviews"
+    print(f"Targeting Absolute API Review Endpoint URL: {review_url}")
+    
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
@@ -157,7 +168,6 @@ def post_github_inline_review(findings: List[Dict]):
         "comments": comments_payload
     }
     
-    print(f"Posting {len(comments_payload)} inline comments via API Review Endpoint...")
     res = requests.post(review_url, headers=headers, json=review_body)
     if res.status_code == 201:
         print("Successfully posted inline code review comments!")
@@ -199,11 +209,15 @@ def main():
     print(f"Initiating multi-agent execution...")
     try:
         final_output = graph.invoke(initial_state)
-        # Handle state packing formats
         target_findings = final_output.get("final_findings", [])
-        if isinstance(target_findings, list) and len(target_findings) > 0 and isinstance(target_findings[0], list):
-            target_findings = target_findings[-1]
-            
+        
+        # Handle dictionary aggregation unpacked from state lists
+        if isinstance(target_findings, list) and len(target_findings) > 0:
+            if isinstance(target_findings[-1], list):
+                target_findings = target_findings[-1]
+            elif isinstance(target_findings[-1], dict) and "final_findings" in target_findings[-1]:
+                target_findings = target_findings[-1]["final_findings"]
+                
         post_github_inline_review(target_findings)
     except Exception as e:
         print(f"Runtime execution block error: {str(e)}")
