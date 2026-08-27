@@ -24,7 +24,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install langchain-anthropic langgraph pydantic
+          pip install langchain-anthropic langgraph pydantic requests
 
       - name: Download PR Diff Text File
         env:
@@ -37,18 +37,8 @@ jobs:
       - name: Run Multi-Agent Reviewer
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO_NAME: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: python .github/scripts/review_agent.py
-
-      - name: Post Comment via Native GitHub CLI
-        if: success() && hashFiles('final_report.md') != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file final_report.md
-
-      - name: Handle Workflow Failure
-        if: failure()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr comment "${{ github.event.pull_request.number }}" --body "⚠️ **Multi-Agent Code Review Failure:** The automated review pipeline encountered a runtime error while executing checks. Please consult the GitHub Actions logs tab to triage the execution fault."
