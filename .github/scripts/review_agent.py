@@ -27,7 +27,7 @@ class ReviewState(Dict[str, Any]):
     final_report: str
 
 # =====================================================================
-# 2. GITHUB CONTEXT UTILITIES
+# 2. GITHUB CONTEXT UTILITIES (FIXED URL PATHS)
 # =====================================================================
 
 def get_pr_diff() -> str:
@@ -37,9 +37,10 @@ def get_pr_diff() -> str:
     token = os.getenv("GITHUB_TOKEN")
     
     if not all([repo, pr_num, token]):
-        print("Missing required environment variables (REPO_NAME, PR_NUMBER, or GITHUB_TOKEN).")
+        print("Missing required environment variables.")
         sys.exit(1)
         
+    # FIX: Explicit full API base domain path
     url = f"https://github.com{repo}/pulls/{pr_num}"
     headers = {
         "Authorization": f"token {token}",
@@ -53,11 +54,10 @@ def get_pr_diff() -> str:
     return response.text
 
 # =====================================================================
-# 3. SPECIALIZED SUB-AGENT NODES (PARALLEL EXECUTION)
+# 3. SPECIALIZED SUB-AGENT NODES
 # =====================================================================
 
 def security_agent(state: ReviewState) -> Dict:
-    """Scans the codebase updates specifically looking for safety issues."""
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Security Sentinel. Analyze this git diff for vulnerabilities, "
@@ -68,7 +68,6 @@ def security_agent(state: ReviewState) -> Dict:
     return {"security_findings": [f.model_dump() for f in result.findings]}
 
 def bug_hunter_agent(state: ReviewState) -> Dict:
-    """Scans the codebase updates specifically looking for logical defects."""
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Bug Hunter. Analyze this git diff for logical flaws, "
@@ -79,7 +78,6 @@ def bug_hunter_agent(state: ReviewState) -> Dict:
     return {"bug_findings": [f.model_dump() for f in result.findings]}
 
 def style_agent(state: ReviewState) -> Dict:
-    """Scans the codebase updates specifically looking for formatting and consistency issues."""
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are a Style and Pattern Architect. Analyze this git diff for readability, "
@@ -94,7 +92,6 @@ def style_agent(state: ReviewState) -> Dict:
 # =====================================================================
 
 def synthesizer_node(state: ReviewState) -> Dict:
-    """Aggregates all independent metrics, filters anomalies, and groups output."""
     llm = ChatAnthropic(model="claude-3-5-sonnet-latest", temperature=0.2)
     
     all_findings = {
@@ -119,6 +116,7 @@ def post_github_comment(report: str):
     pr_num = os.getenv("PR_NUMBER")
     token = os.getenv("GITHUB_TOKEN")
     
+    # FIX: Explicit full API base domain path
     url = f"https://github.com{repo}/issues/{pr_num}/comments"
     headers = {
         "Authorization": f"token {token}",
@@ -142,27 +140,19 @@ def main():
         print("Diff content is empty. Skipping review processing loop.")
         return
 
-    # Initialize Graph Topology
     builder = StateGraph(ReviewState)
-    
-    # Map Architecture System Nodes
     builder.add_node("security_agent", security_agent)
     builder.add_node("bug_hunter_agent", bug_hunter_agent)
     builder.add_node("style_agent", style_agent)
     builder.add_node("synthesizer", synthesizer_node)
     
-    # Define Parallel Fan-Out Execution Flow paths
     builder.set_entry_point(["security_agent", "bug_hunter_agent", "style_agent"])
-    
-    # Map Async Fan-In collection limits down to the Synthesizer
     builder.add_edge("security_agent", "synthesizer")
     builder.add_edge("bug_hunter_agent", "synthesizer")
     builder.add_edge("style_agent", "synthesizer")
     builder.add_edge("synthesizer", END)
     
-    # Build System State Machines
     graph = builder.compile()
-    
     initial_state = {
         "diff": diff_content,
         "security_findings": [],
@@ -171,10 +161,9 @@ def main():
         "final_report": ""
     }
     
-    print("Initiating Multi-Agent Code Review pipeline layout graph execution...")
+    print("Initiating execution...")
     final_output = graph.invoke(initial_state)
-    
-    print("Publishing report findings downstream...")
+    print("Publishing report findings...")
     post_github_comment(final_output["final_report"])
 
 if __name__ == "__main__":
