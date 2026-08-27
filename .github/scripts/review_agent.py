@@ -8,7 +8,14 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END, START
 
 # =====================================================================
-# 1. DATA MODELS & STATE SETUP
+# 1. MODEL CONFIGURATION
+# =====================================================================
+# If your API account fails on sonnet-20241022, you can change this to 
+# "claude-3-opus-20240229" or "claude-3-haiku-20240307"
+MODEL_NAME = "claude-3-5-sonnet-20241022"
+
+# =====================================================================
+# 2. DATA MODELS & STATE SETUP
 # =====================================================================
 
 class ReviewFinding(BaseModel):
@@ -27,7 +34,7 @@ class ReviewState(Dict[str, Any]):
     final_report: str
 
 # =====================================================================
-# 2. GITHUB CONTEXT UTILITIES
+# 3. GITHUB CONTEXT UTILITIES
 # =====================================================================
 
 def get_pr_diff() -> str:
@@ -41,11 +48,11 @@ def get_pr_diff() -> str:
     return content
 
 # =====================================================================
-# 3. SPECIALIZED SUB-AGENT NODES
+# 4. SPECIALIZED SUB-AGENT NODES
 # =====================================================================
 
 def security_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0).with_structured_output(AgentOutput)
+    llm = ChatAnthropic(model=MODEL_NAME, temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Security Sentinel. Analyze this git diff for vulnerabilities, "
         "hardcoded secrets, injection flaws, or improper error handling that leaks data.\n\n"
@@ -55,7 +62,7 @@ def security_agent(state: ReviewState) -> Dict:
     return {"security_findings": [f.model_dump() for f in result.findings]}
 
 def bug_hunter_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0).with_structured_output(AgentOutput)
+    llm = ChatAnthropic(model=MODEL_NAME, temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are an expert Bug Hunter. Analyze this git diff for logical flaws, "
         "race conditions, edge cases, null pointer exceptions, or off-by-one errors.\n\n"
@@ -65,7 +72,7 @@ def bug_hunter_agent(state: ReviewState) -> Dict:
     return {"bug_findings": [f.model_dump() for f in result.findings]}
 
 def style_agent(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0).with_structured_output(AgentOutput)
+    llm = ChatAnthropic(model=MODEL_NAME, temperature=0).with_structured_output(AgentOutput)
     prompt = (
         "You are a Style and Pattern Architect. Analyze this git diff for readability, "
         "naming consistency, missing documentation, or violations of clean code standards.\n\n"
@@ -75,11 +82,11 @@ def style_agent(state: ReviewState) -> Dict:
     return {"style_findings": [f.model_dump() for f in result.findings]}
 
 # =====================================================================
-# 4. SYNTHESIZER NODE & GITHUB OUTPUT
+# 5. SYNTHESIZER NODE & GITHUB OUTPUT
 # =====================================================================
 
 def synthesizer_node(state: ReviewState) -> Dict:
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.2)
+    llm = ChatAnthropic(model=MODEL_NAME, temperature=0.2)
     
     all_findings = {
         "Security": state.get("security_findings", []),
@@ -119,7 +126,7 @@ def post_github_comment(report: str):
         print(f"Failed to post comment to GitHub API (Status {res.status_code}): {res.text}")
 
 # =====================================================================
-# 5. ORCHESTRATION PIPELINE DEFINITION
+# 6. ORCHESTRATION PIPELINE DEFINITION
 # =====================================================================
 
 def main():
@@ -134,18 +141,18 @@ def main():
     builder.add_node("style_agent", style_agent)
     builder.add_node("synthesizer", synthesizer_node)
     
-    # Correct parallel fan-out entry routing using START edge loops
+    # Connect START to parallel nodes
     builder.add_edge(START, "security_agent")
     builder.add_edge(START, "bug_hunter_agent")
     builder.add_edge(START, "style_agent")
     
-    # Map Async Fan-In collection limits down to the Synthesizer
+    # Route edge aggregations downstream
     builder.add_edge("security_agent", "synthesizer")
     builder.add_edge("bug_hunter_agent", "synthesizer")
     builder.add_edge("style_agent", "synthesizer")
     builder.add_edge("synthesizer", END)
     
-    # Build System State Machines
+    # Compile Graph
     graph = builder.compile()
     
     initial_state = {
@@ -156,7 +163,7 @@ def main():
         "final_report": ""
     }
     
-    print("Initiating execution...")
+    print(f"Initiating execution using model: {MODEL_NAME}...")
     final_output = graph.invoke(initial_state)
     print("Publishing report findings...")
     post_github_comment(final_output["final_report"])
