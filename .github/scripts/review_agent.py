@@ -16,12 +16,6 @@ class ReviewFinding(BaseModel):
     category: str = Field(description="Category of the finding: 'Security', 'Bug', or 'Style'")
     comment: str = Field(description="Actionable, direct feedback explaining the issue and fix.")
 
-
-
-
-
-
-a
 class AgentOutput(BaseModel):
     findings: List[ReviewFinding] = Field(default_factory=list)
 
