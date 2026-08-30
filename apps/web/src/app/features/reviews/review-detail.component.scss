@@ -1,0 +1,15 @@
+.back-link { display: inline-block; margin-bottom: 16px; color: #175cd3; text-decoration: none; }
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 18px; }
+.finding { padding: 18px; border-bottom: 1px solid #e4e7ec; }
+.finding:last-child { border-bottom: 0; }
+.finding-heading { display: flex; align-items: center; gap: 9px; color: #667085; font-size: 12px; }
+.finding h3 { margin: 12px 0 7px; }
+.finding p, .finding li { color: #475467; line-height: 1.55; }
+.trace-list { margin: 0; padding: 10px 18px; list-style: none; }
+.trace-list li { position: relative; display: grid; grid-template-columns: 18px 1fr; gap: 10px; padding: 10px 0; }
+.trace-list li:not(:last-child)::before { content: ''; position: absolute; left: 6px; top: 28px; bottom: -6px; width: 1px; background: #e4e7ec; }
+.trace-marker { width: 13px; height: 13px; margin-top: 3px; border-radius: 50%; background: #98a2b3; }
+.trace-marker.completed { background: #12b76a; }.trace-marker.running, .trace-marker.queued { background: #2e90fa; }.trace-marker.failed { background: #f04438; }
+.trace-list .badge { margin-left: 8px; }
+.trace-list p { margin: 5px 0; color: #475467; font-size: 13px; }.trace-list small { color: #98a2b3; }
+@media (max-width: 960px) { .detail-grid { grid-template-columns: 1fr; } }

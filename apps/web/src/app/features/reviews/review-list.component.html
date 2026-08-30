@@ -1,0 +1,13 @@
+<header class="page-heading"><div><h1>Pull request reviews</h1><p>Inspect status, findings, and specialist execution.</p></div></header>
+<section class="panel table-scroll">
+  @if (loading()) { <div class="loading-state">Loading reviews…</div> }
+  @else if (error()) { <div class="error-state">{{ error() }}</div> }
+  @else if (reviews().length === 0) { <div class="empty-state">No reviews are available.</div> }
+  @else {
+    <table><thead><tr><th>Pull request</th><th>Commit</th><th>Findings</th><th>Updated</th><th>Status</th></tr></thead><tbody>
+      @for (review of reviews(); track review.id) {
+        <tr><td><a [routerLink]="['/reviews', review.id]"><strong>{{ review.repository }} #{{ review.pull_request_number }}</strong></a></td><td><code>{{ review.head_sha.slice(0, 8) }}</code></td><td>{{ review.finding_count }}</td><td>{{ review.updated_at | date:'short' }}</td><td><span class="badge" [class]="'badge ' + review.status">{{ review.status }}</span></td></tr>
+      }
+    </tbody></table>
+  }
+</section>
