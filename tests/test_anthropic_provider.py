@@ -80,3 +80,17 @@ def test_provider_defaults_source_and_isolates_invalid_finding(monkeypatch) -> N
 
     assert len(findings) == 1
     assert findings[0].source_agent == "security.input-validation"
+
+
+def test_provider_decodes_json_encoded_findings_array() -> None:
+    """Claude occasionally serializes the structured array one extra time."""
+    batch = anthropic._ProviderFindingBatch.model_validate(
+        {
+            "findings": "[{\"title\":\"Unsafe eval\",\"category\":\"security\","
+            "\"severity\":\"high\",\"confidence\":0.9,\"path\":\"src/example.py\","
+            "\"line\":1,\"comment\":\"External input reaches dynamic evaluation.\"}]"
+        }
+    )
+
+    assert len(batch.findings) == 1
+    assert batch.findings[0].title == "Unsafe eval"

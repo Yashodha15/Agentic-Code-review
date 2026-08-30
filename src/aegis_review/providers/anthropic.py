@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
+
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from aegis_review.models import ReviewFinding
 from aegis_review.providers.base import AgentRequest
@@ -29,6 +31,18 @@ class _ProviderFindingBatch(BaseModel):
     """Structured Anthropic response before per-finding validation."""
 
     findings: list[_ProviderFinding] = Field(default_factory=list)
+
+    @field_validator("findings", mode="before")
+    @classmethod
+    def decode_json_encoded_findings(cls, value: object) -> object:
+        """Accept a provider that serializes the array one extra time."""
+
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return value
+        return value
 
 
 class AnthropicReviewProvider:
