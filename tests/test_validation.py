@@ -54,4 +54,3 @@ def test_deduplication_keeps_the_highest_confidence_finding() -> None:
 
     assert len(result) == 1
     assert result[0].confidence == 0.96
-

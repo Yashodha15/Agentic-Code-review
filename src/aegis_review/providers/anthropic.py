@@ -2,11 +2,51 @@
 
 from __future__ import annotations
 
+import json
+import logging
+
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from aegis_review.models import AgentFindingBatch, ReviewFinding
+from aegis_review.models import ReviewFinding
 from aegis_review.providers.base import AgentRequest
+
+
+logger = logging.getLogger(__name__)
+
+
+class _ProviderFinding(BaseModel):
+    """Permissive provider payload normalized into the strict public model."""
+
+    title: str
+    category: str
+    severity: str
+    confidence: float
+    path: str
+    line: int
+    comment: str
+    evidence: list[str] = Field(default_factory=list)
+    suggested_fix: str | None = None
+    source_agent: str | None = None
+
+
+class _ProviderFindingBatch(BaseModel):
+    """Structured Anthropic response before per-finding validation."""
+
+    findings: list[_ProviderFinding] = Field(default_factory=list)
+
+    @field_validator("findings", mode="before")
+    @classmethod
+    def decode_json_encoded_findings(cls, value: object) -> object:
+        """Accept a provider that serializes the array one extra time."""
+
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return value
+        return value
 
 
 class AnthropicReviewProvider:
@@ -25,9 +65,8 @@ class AnthropicReviewProvider:
             model=model,
             timeout=timeout_seconds,
             max_tokens=max_tokens,
-            temperature=0,
         )
-        self._structured_client = client.with_structured_output(AgentFindingBatch)
+        self._structured_client = client.with_structured_output(_ProviderFindingBatch)
 
     def review(self, request: AgentRequest) -> list[ReviewFinding]:
         human_prompt = (
@@ -47,4 +86,19 @@ class AnthropicReviewProvider:
         result = self._structured_client.invoke(
             [SystemMessage(content=request.system_instructions), HumanMessage(content=human_prompt)]
         )
-        return result.findings
+        findings: list[ReviewFinding] = []
+        for candidate in result.findings:
+            values = candidate.model_dump()
+            values["source_agent"] = candidate.source_agent or request.agent_name
+            try:
+                findings.append(ReviewFinding.model_validate(values))
+            except ValidationError as error:
+                # Isolate a malformed candidate instead of discarding valid
+                # siblings returned by the same specialist invocation.
+                logger.warning(
+                    "Dropped malformed finding from %s (%d validation error(s)).",
+                    request.agent_name,
+                    error.error_count(),
+                )
+                continue
+        return findings
