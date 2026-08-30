@@ -4,9 +4,31 @@ from __future__ import annotations
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import BaseModel, Field, ValidationError
 
-from aegis_review.models import AgentFindingBatch, ReviewFinding
+from aegis_review.models import ReviewFinding
 from aegis_review.providers.base import AgentRequest
+
+
+class _ProviderFinding(BaseModel):
+    """Permissive provider payload normalized into the strict public model."""
+
+    title: str
+    category: str
+    severity: str
+    confidence: float
+    path: str
+    line: int
+    comment: str
+    evidence: list[str] = Field(default_factory=list)
+    suggested_fix: str | None = None
+    source_agent: str | None = None
+
+
+class _ProviderFindingBatch(BaseModel):
+    """Structured Anthropic response before per-finding validation."""
+
+    findings: list[_ProviderFinding] = Field(default_factory=list)
 
 
 class AnthropicReviewProvider:
@@ -26,7 +48,7 @@ class AnthropicReviewProvider:
             timeout=timeout_seconds,
             max_tokens=max_tokens,
         )
-        self._structured_client = client.with_structured_output(AgentFindingBatch)
+        self._structured_client = client.with_structured_output(_ProviderFindingBatch)
 
     def review(self, request: AgentRequest) -> list[ReviewFinding]:
         human_prompt = (
@@ -46,4 +68,14 @@ class AnthropicReviewProvider:
         result = self._structured_client.invoke(
             [SystemMessage(content=request.system_instructions), HumanMessage(content=human_prompt)]
         )
-        return result.findings
+        findings: list[ReviewFinding] = []
+        for candidate in result.findings:
+            values = candidate.model_dump()
+            values["source_agent"] = candidate.source_agent or request.agent_name
+            try:
+                findings.append(ReviewFinding.model_validate(values))
+            except ValidationError:
+                # Isolate a malformed candidate instead of discarding valid
+                # siblings returned by the same specialist invocation.
+                continue
+        return findings
