@@ -1,0 +1,17 @@
+<a class="back-link" routerLink="/reviews">← All reviews</a>
+@if (loading()) { <div class="loading-state">Loading review…</div> }
+@else if (error()) { <div class="error-state">{{ error() }}</div> }
+@else { @if (review(); as item) {
+  <header class="page-heading"><div><h1>{{ item.repository }} #{{ item.pull_request_number }}</h1><p>Commit {{ item.head_sha.slice(0, 10) }} · updated {{ item.updated_at | date:'medium' }}</p></div><span class="badge" [class]="'badge ' + item.status">{{ item.status }}</span></header>
+  <div class="detail-grid">
+    <section class="panel"><div class="panel-heading"><h2>Verified findings</h2></div>
+      @if (findings().length === 0) { <div class="empty-state">No verified findings.</div> }
+      @for (finding of findings(); track finding.path + ':' + finding.line + ':' + finding.title) {
+        <article class="finding"><div class="finding-heading"><span class="badge" [class]="'badge ' + finding.severity">{{ finding.severity }}</span><span>{{ finding.category }}</span><span>{{ finding.confidence | percent }}</span></div><h3>{{ finding.title }}</h3><code>{{ finding.path }}:{{ finding.line }}</code><p>{{ finding.comment }}</p>@if (finding.evidence.length) { <ul>@for (evidence of finding.evidence; track evidence) { <li>{{ evidence }}</li> }</ul> }</article>
+      }
+    </section>
+    <section class="panel"><div class="panel-heading"><h2>Agent execution trace</h2></div><ol class="trace-list">
+      @for (trace of traces(); track trace.sequence) { <li><span class="trace-marker" [class]="trace.status"></span><div><strong>{{ trace.stage }}</strong><span class="badge" [class]="'badge ' + trace.status">{{ trace.status }}</span><p>{{ trace.detail }}</p><small>{{ trace.created_at | date:'mediumTime' }}</small></div></li> }
+    </ol></section>
+  </div>
+} }

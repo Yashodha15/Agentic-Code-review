@@ -1,0 +1,18 @@
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" routerLink="/" aria-label="Aegis Review dashboard">
+      <span class="brand-mark">A</span><span>Aegis Review</span>
+    </a>
+    <div class="organization"><span>Organization</span><strong>Local workspace</strong></div>
+    <nav aria-label="Primary navigation">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">▦ Dashboard</a>
+      <a routerLink="/reviews" routerLinkActive="active">⑂ Reviews</a>
+      <a routerLink="/settings" routerLinkActive="active">⚙ Settings</a>
+    </nav>
+    <div class="connection-state"><span></span> API connected locally</div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><span>Development environment</span><strong aria-label="Current user">GR</strong></header>
+    <main><router-outlet /></main>
+  </div>
+</div>

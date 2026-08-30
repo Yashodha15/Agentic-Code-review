@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    command: ["python", "-m", "aegis_review.cli", "api", "--host", "0.0.0.0"]
+    env_file: .env
+    volumes:
+      - aegis-data:/data
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["python", "-m", "aegis_review.cli", "worker"]
+    env_file: .env
+    volumes:
+      - aegis-data:/data
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  web:
+    build: ./apps/web
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  aegis-data:

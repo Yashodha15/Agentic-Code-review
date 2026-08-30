@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+node_modules/
+dist/
+data/
+secrets/*
+!secrets/.gitkeep
+
+# Local review artifacts and credentials must never be committed.
+pr_diff.txt
+review_payload.json
+.env
+.env.*
+!.env.example

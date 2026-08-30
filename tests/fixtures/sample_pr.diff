@@ -1,0 +1,22 @@
+diff --git a/src/access.py b/src/access.py
+index 1111111..2222222 100644
+--- a/src/access.py
++++ b/src/access.py
+@@ -8,5 +8,7 @@ def get_resource(user, resource):
+     if resource is None:
+         return None
+-    return resource
++    if resource.cached:
++        return resource
++    return require_access(user, resource)
+diff --git a/src/old_name.py b/src/new_name.py
+similarity index 91%
+rename from src/old_name.py
+rename to src/new_name.py
+--- a/src/old_name.py
++++ b/src/new_name.py
+@@ -1,2 +1,2 @@
+-OLD_NAME = "old"
++NEW_NAME = "new"
+ KEEP = True
+
