@@ -5,12 +5,17 @@ on:
   push:
     branches: [main]
 
+# The build only needs to read repository contents. Keeping the token scope
+# explicit prevents future workflow changes from inheriting write access.
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: python -m pip install -e '.[agents,api,dev]'
@@ -22,8 +27,8 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "24.19"
           cache: npm
