@@ -26,6 +26,12 @@ MANIFEST_PATHS = (
 )
 
 
+def _review_event(errors: list[str]) -> str:
+    """Fail closed when any selected review step did not complete."""
+
+    return "REQUEST_CHANGES" if errors else "COMMENT"
+
+
 @dataclass(frozen=True)
 class PullRequestContext:
     """Repository data required by adapters and review agents."""
@@ -194,13 +200,15 @@ class HttpGitHubReviewClient:
             }
             for finding in findings
         ]
-        body = (
-            f"Aegis completed review with {len(findings)} verified finding(s)."
-            + (f" {len(errors)} specialist step(s) reported errors." if errors else "")
-        )
+        body = f"Aegis completed review with {len(findings)} verified finding(s)."
+        if errors:
+            body += (
+                f" {len(errors)} specialist step(s) reported errors. "
+                "Review is incomplete; merge must remain blocked until a clean rerun."
+            )
         payload = {
             "commit_id": review.head_sha,
-            "event": "COMMENT",
+            "event": _review_event(errors),
             "body": body,
             "comments": comments,
         }

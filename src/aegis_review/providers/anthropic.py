@@ -39,13 +39,15 @@ class _ProviderFindingBatch(BaseModel):
     @field_validator("findings", mode="before")
     @classmethod
     def decode_json_encoded_findings(cls, value: object) -> object:
-        """Accept a provider that serializes the array one extra time."""
+        """Unwrap common extra serialization layers from provider output."""
 
         if isinstance(value, str):
             try:
-                return json.loads(value)
+                value = json.loads(value)
             except json.JSONDecodeError:
                 return value
+        if isinstance(value, dict) and set(value) == {"findings"}:
+            return value["findings"]
         return value
 
 
