@@ -8,8 +8,12 @@ from aegis_review.models import AdapterMatch, AgentAssignment, ReviewPlan, Sever
 SECURITY_PATH_TERMS = (
     "access",
     "auth",
+    "credential",
+    "crypto",
+    "password",
     "permission",
     "policy",
+    "security",
     "secret",
     "token",
     "session",

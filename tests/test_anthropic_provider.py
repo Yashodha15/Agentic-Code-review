@@ -100,6 +100,26 @@ def test_provider_decodes_json_encoded_findings_array() -> None:
     assert batch.findings[0].title == "Unsafe eval"
 
 
+def test_provider_unwraps_nested_findings_object() -> None:
+    """Tool output may wrap the array in a second findings object."""
+    candidate = {
+        "title": "Unsafe eval",
+        "category": "security",
+        "severity": "high",
+        "confidence": 0.9,
+        "path": "src/example.py",
+        "line": 1,
+        "comment": "External input reaches dynamic evaluation.",
+    }
+
+    batch = anthropic._ProviderFindingBatch.model_validate(
+        {"findings": {"findings": [candidate]}}
+    )
+
+    assert len(batch.findings) == 1
+    assert batch.findings[0].title == "Unsafe eval"
+
+
 def test_provider_logs_all_invalid_candidates_without_content(monkeypatch, caplog) -> None:
     """An empty normalized batch remains observable without leaking content."""
     result = anthropic._ProviderFindingBatch(

@@ -26,3 +26,13 @@ def test_test_only_change_does_not_add_test_coverage_team() -> None:
     assert "correctness" in leads
     assert "testing" not in leads
 
+
+def test_security_named_file_always_selects_security_team() -> None:
+    """Explicit security paths must not rely on another keyword to be risky."""
+    files = ["src/aegis_review/security_review_probe.py"]
+
+    plan = build_review_plan(files, [])
+    leads = {assignment.lead_agent for assignment in plan.assignments}
+
+    assert "security" in leads
+    assert plan.risk_level == "high"
