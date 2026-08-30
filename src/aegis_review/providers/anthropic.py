@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -10,6 +11,9 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from aegis_review.models import ReviewFinding
 from aegis_review.providers.base import AgentRequest
+
+
+logger = logging.getLogger(__name__)
 
 
 class _ProviderFinding(BaseModel):
@@ -88,8 +92,13 @@ class AnthropicReviewProvider:
             values["source_agent"] = candidate.source_agent or request.agent_name
             try:
                 findings.append(ReviewFinding.model_validate(values))
-            except ValidationError:
+            except ValidationError as error:
                 # Isolate a malformed candidate instead of discarding valid
                 # siblings returned by the same specialist invocation.
+                logger.warning(
+                    "Dropped malformed finding from %s (%d validation error(s)).",
+                    request.agent_name,
+                    error.error_count(),
+                )
                 continue
         return findings

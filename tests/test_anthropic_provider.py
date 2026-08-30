@@ -1,6 +1,10 @@
 """Tests for the Anthropic-backed review provider."""
 
+import logging
+
+import pytest
 from langchain_anthropic import ChatAnthropic
+from pydantic import ValidationError
 
 from aegis_review.providers import anthropic
 from aegis_review.providers.base import AgentRequest
@@ -94,3 +98,36 @@ def test_provider_decodes_json_encoded_findings_array() -> None:
 
     assert len(batch.findings) == 1
     assert batch.findings[0].title == "Unsafe eval"
+
+
+def test_provider_logs_all_invalid_candidates_without_content(monkeypatch, caplog) -> None:
+    """An empty normalized batch remains observable without leaking content."""
+    result = anthropic._ProviderFindingBatch(
+        findings=[
+            anthropic._ProviderFinding(
+                title="S" * 121,
+                category="security",
+                severity="high",
+                confidence=0.9,
+                path="src/example.py",
+                line=1,
+                comment="Sensitive model content that must not appear in logs.",
+            )
+        ]
+    )
+    monkeypatch.setattr(anthropic, "ChatAnthropic", lambda **_kwargs: _FakeClient(result))
+
+    with caplog.at_level(logging.WARNING, logger=anthropic.__name__):
+        findings = anthropic.AnthropicReviewProvider(model="claude-sonnet-5").review(
+            _request()
+        )
+
+    assert findings == []
+    assert "Dropped malformed finding from security.input-validation" in caplog.text
+    assert "Sensitive model content" not in caplog.text
+
+
+def test_provider_rejects_non_json_encoded_findings_array() -> None:
+    """A malformed encoded array remains a clear structured-output failure."""
+    with pytest.raises(ValidationError):
+        anthropic._ProviderFindingBatch.model_validate({"findings": "not-json"})
