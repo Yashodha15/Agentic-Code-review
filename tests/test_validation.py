@@ -55,3 +55,10 @@ def test_deduplication_keeps_the_highest_confidence_finding() -> None:
     assert len(result) == 1
     assert result[0].confidence == 0.96
 
+
+def test_normalizes_overlong_model_generated_title() -> None:
+    """A verbose title must not discard an otherwise valid model response."""
+    finding = make_finding(title="A" * 140)
+
+    assert len(finding.title) == 120
+    assert finding.title.endswith("...")

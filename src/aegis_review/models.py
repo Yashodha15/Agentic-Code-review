@@ -44,6 +44,15 @@ class ReviewFinding(BaseModel):
     source_agent: str
     status: FindingStatus = FindingStatus.PROPOSED
 
+    @field_validator("title", mode="before")
+    @classmethod
+    def bound_model_generated_title(cls, value: object) -> object:
+        """Keep one verbose model title from invalidating its entire batch."""
+
+        if isinstance(value, str) and len(value) > 120:
+            return value[:117].rstrip() + "..."
+        return value
+
     @field_validator("path")
     @classmethod
     def normalize_repository_path(cls, value: str) -> str:
