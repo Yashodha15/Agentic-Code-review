@@ -25,7 +25,6 @@ class AnthropicReviewProvider:
             model=model,
             timeout=timeout_seconds,
             max_tokens=max_tokens,
-            temperature=0,
         )
         self._structured_client = client.with_structured_output(AgentFindingBatch)
 
