@@ -1,5 +1,6 @@
 import { DatePipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ReviewFinding, ReviewRecord, ReviewTraceEvent } from '../../core/api.models';
@@ -78,6 +79,16 @@ export class ReviewDetailComponent {
     }).subscribe({
       next: result => { this.review.set(result.review); this.traces.set(result.traces); this.findings.set(result.findings); this.loading.set(false); },
       error: () => { this.error.set('This review could not be loaded.'); this.loading.set(false); }
+    });
+    this.api.streamReview(this.reviewId).pipe(takeUntilDestroyed()).subscribe({
+      next: snapshot => {
+        this.review.set(snapshot.review);
+        this.traces.set(snapshot.traces);
+        this.findings.set(snapshot.findings);
+        this.loading.set(false);
+        this.error.set('');
+      },
+      error: () => { this.error.set('Live review updates were interrupted.'); }
     });
   }
 }

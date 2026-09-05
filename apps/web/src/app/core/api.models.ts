@@ -40,6 +40,12 @@ export interface ReviewFinding {
   status: 'proposed' | 'verified' | 'rejected';
 }
 
+export interface ReviewSnapshot {
+  review: ReviewRecord;
+  traces: ReviewTraceEvent[];
+  findings: ReviewFinding[];
+}
+
 export interface ReviewPolicy {
   minimum_severity: 'low' | 'medium' | 'high' | 'critical';
   require_verified_findings: boolean;

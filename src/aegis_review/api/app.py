@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from aegis_review.api.schemas import (
@@ -29,6 +32,13 @@ from aegis_review.storage.policy import InMemoryPolicyStore, PolicyStore
 
 SUPPORTED_PULL_REQUEST_ACTIONS = {"opened", "reopened", "synchronize", "ready_for_review"}
 MAX_WEBHOOK_BYTES = 2 * 1024 * 1024
+SSE_POLL_SECONDS = 1.0
+
+
+def _sse_message(event: str, payload: object) -> str:
+    """Encode one named SSE message using compact, JSON-safe data."""
+
+    return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
 def create_app(
@@ -138,6 +148,39 @@ def create_app(
     def list_reviews(limit: int = Query(default=50, ge=1, le=200)) -> list[ReviewRecord]:
         return review_repository.list(limit=limit)
 
+    @app.get("/api/v1/reviews/events", tags=["reviews"])
+    async def stream_reviews(
+        request: Request,
+        limit: int = Query(default=50, ge=1, le=200),
+        once: bool = Query(default=False),
+    ) -> StreamingResponse:
+        """Stream the review list whenever persisted review state changes.
+
+        Polling the repository is deliberate: the API and review worker run in
+        separate processes, while SQLite is their shared source of truth.
+        """
+
+        async def events() -> AsyncIterator[str]:
+            previous = ""
+            while not await request.is_disconnected():
+                records = review_repository.list(limit=limit)
+                payload = [record.model_dump(mode="json") for record in records]
+                encoded = json.dumps(payload, separators=(",", ":"))
+                if encoded != previous:
+                    previous = encoded
+                    yield _sse_message("reviews", payload)
+                else:
+                    yield ": keep-alive\n\n"
+                if once:
+                    return
+                await asyncio.sleep(SSE_POLL_SECONDS)
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     @app.get(
         "/api/v1/reviews/{review_id}",
         response_model=ReviewRecord,
@@ -170,6 +213,51 @@ def create_app(
             return review_repository.list_findings(review_id)
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Review not found.") from error
+
+    @app.get("/api/v1/reviews/{review_id}/events", tags=["reviews"])
+    async def stream_review(
+        review_id: str,
+        request: Request,
+        once: bool = Query(default=False),
+    ) -> StreamingResponse:
+        """Stream a complete review snapshot as agents update its persisted state."""
+
+        if review_repository.get(review_id) is None:
+            raise HTTPException(status_code=404, detail="Review not found.")
+
+        async def events() -> AsyncIterator[str]:
+            previous = ""
+            while not await request.is_disconnected():
+                review = review_repository.get(review_id)
+                if review is None:
+                    yield _sse_message("deleted", {"id": review_id})
+                    return
+                snapshot = {
+                    "review": review.model_dump(mode="json"),
+                    "traces": [
+                        trace.model_dump(mode="json")
+                        for trace in review_repository.list_traces(review_id)
+                    ],
+                    "findings": [
+                        finding.model_dump(mode="json")
+                        for finding in review_repository.list_findings(review_id)
+                    ],
+                }
+                encoded = json.dumps(snapshot, separators=(",", ":"))
+                if encoded != previous:
+                    previous = encoded
+                    yield _sse_message("review", snapshot)
+                else:
+                    yield ": keep-alive\n\n"
+                if once:
+                    return
+                await asyncio.sleep(SSE_POLL_SECONDS)
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.get("/api/v1/policy", response_model=ReviewPolicy, tags=["configuration"])
     def get_policy() -> ReviewPolicy:
