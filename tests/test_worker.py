@@ -6,8 +6,10 @@ import pytest
 from aegis_review.api.schemas import ReviewRecord, ReviewStatus
 from aegis_review.github.client import FakeGitHubReviewClient, PullRequestContext
 from aegis_review.models import ReviewFinding, Severity
+from aegis_review.config import ReviewLimits, ReviewPolicy
 from aegis_review.providers.fake import FakeReviewProvider
 from aegis_review.storage.memory import InMemoryReviewRepository
+from aegis_review.storage.policy import InMemoryPolicyStore
 from aegis_review.worker import ReviewWorker
 
 
@@ -137,3 +139,33 @@ def test_worker_rejects_unknown_or_already_completed_reviews() -> None:
     repository.update_status("review-1", ReviewStatus.COMPLETED)
     with pytest.raises(ValueError, match="cannot run"):
         worker.process("review-1")
+
+
+def test_worker_enforces_delegation_and_comment_limits() -> None:
+    worker, repository, github, provider = setup_worker()
+    worker.policies = InMemoryPolicyStore(
+        ReviewPolicy(
+            limits=ReviewLimits(
+                maximum_delegation_depth=1,
+                maximum_comments=1,
+            )
+        )
+    )
+
+    worker.process("review-1")
+
+    assert all(request.parent_agent is None for request in provider.requests)
+    assert len(repository.list_findings("review-1")) == 1
+    assert github.check_runs[0]["conclusion"] == "success"
+
+
+def test_worker_blocks_check_for_critical_finding() -> None:
+    worker, _, github, provider = setup_worker()
+    provider.responses["security"] = [
+        verified_finding().model_copy(update={"severity": Severity.CRITICAL})
+    ]
+
+    worker.process("review-1")
+
+    assert github.check_runs[0]["conclusion"] == "failure"
+    assert "critical" in str(github.check_runs[0]["reasons"]).lower()

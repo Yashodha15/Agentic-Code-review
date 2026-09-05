@@ -5,9 +5,9 @@ import { ReviewListComponent } from './features/reviews/review-list.component';
 import { SettingsComponent } from './features/settings/settings.component';
 
 export const routes: Routes = [
-  { path: '', component: DashboardComponent, title: 'Dashboard · Aegis Review' },
-  { path: 'reviews', component: ReviewListComponent, title: 'Reviews · Aegis Review' },
-  { path: 'reviews/:id', component: ReviewDetailComponent, title: 'Review · Aegis Review' },
-  { path: 'settings', component: SettingsComponent, title: 'Settings · Aegis Review' },
+  { path: '', component: DashboardComponent, title: 'Dashboard · Code Review' },
+  { path: 'reviews', component: ReviewListComponent, title: 'Reviews · Code Review' },
+  { path: 'reviews/:id', component: ReviewDetailComponent, title: 'Review · Code Review' },
+  { path: 'settings', component: SettingsComponent, title: 'Settings · Code Review' },
   { path: '**', redirectTo: '' }
 ];

@@ -1,6 +1,6 @@
-# Aegis Review
+# Code Review
 
-Aegis Review is a GitHub-connected, hierarchical multi-agent code-review
+Code Review is a GitHub-connected, hierarchical multi-agent code-review
 platform. It receives signed pull-request webhooks, plans a repository-aware
 review, runs specialist leads and focused sub-agents through LangGraph, validates
 every proposed inline comment, publishes verified findings to GitHub, and exposes
@@ -28,7 +28,8 @@ the complete execution through an Angular maintenance console.
 - GitHub inline review publication
 - FastAPI review, finding, trace, and policy endpoints
 - Angular 22 dashboard, review explorer, agent trace, findings, and policy UI
-- Docker Compose deployment for the API, worker, and Angular/Nginx frontend
+- Streamlit engineering console for agent inspection and policy maintenance
+- Docker Compose deployment for the API, worker, Angular UI, and Streamlit console
 - Offline end-to-end test from signed webhook through persisted published review
 
 ## Runtime architecture
@@ -40,9 +41,9 @@ GitHub pull_request webhook
 FastAPI signature verification
           |
           v
-SQLite durable job queue  <------ Angular maintenance UI
-          |                         |
-          v                         v
+SQLite durable job queue  <------ Angular product UI
+          |                 <------ Streamlit operations console
+          v                         |
 Background worker            FastAPI read/config API
           |
           +--> GitHub diff and manifests
@@ -68,6 +69,7 @@ src/aegis_review/
   graph.py        Hierarchical LangGraph orchestration
   worker.py       Review execution and publication lifecycle
   cli.py          API and worker commands
+  console/        Streamlit engineering and maintenance console
 
 apps/web/         Angular 22 maintenance console
 tests/            Unit, graph, API, worker, storage, and end-to-end tests
@@ -115,6 +117,16 @@ npm start
 ```
 
 The Angular development proxy forwards `/api` to `http://127.0.0.1:8000`.
+
+Run the Streamlit operations console:
+
+```bash
+python3 -m pip install -e '.[agents,api,console,dev]'
+AEGIS_API_URL=http://127.0.0.1:8000 streamlit run src/aegis_review/console/app.py
+```
+
+For the production Compose stack, the Angular UI is served at `/` and the
+authenticated Streamlit console is served at `/ops`.
 
 ## Docker Compose
 

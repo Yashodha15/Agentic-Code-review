@@ -15,5 +15,6 @@ secrets/*
 pr_diff.txt
 review_payload.json
 .env
+deploy/auth.env
 .env.*
 !.env.example

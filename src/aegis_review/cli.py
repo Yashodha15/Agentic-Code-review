@@ -67,7 +67,7 @@ def run_worker_loop(poll_seconds: float) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Aegis Review operational commands")
+    parser = argparse.ArgumentParser(description="Code Review operational commands")
     subcommands = parser.add_subparsers(dest="command", required=True)
     api = subcommands.add_parser("api", help="Start the FastAPI server")
     api.add_argument("--host", default="127.0.0.1")

@@ -3,15 +3,112 @@
 @else if (error()) { <div class="error-state">{{ error() }}</div> }
 @else { @if (review(); as item) {
   <header class="page-heading"><div><h1>{{ item.repository }} #{{ item.pull_request_number }}</h1><p>Commit {{ item.head_sha.slice(0, 10) }} · updated {{ item.updated_at | date:'medium' }}</p></div><span class="badge" [class]="'badge ' + item.status">{{ item.status }}</span></header>
+
+  <section class="panel execution-panel" aria-labelledby="execution-graph-title">
+    <div class="panel-heading graph-heading">
+      <div>
+        <h2 id="execution-graph-title">Multi-agent execution graph</h2>
+        <p>Follow orchestration, parallel specialist work, and delegated investigations.</p>
+      </div>
+      <div class="graph-summary" aria-label="Execution summary">
+        <span><strong>{{ agentLanes().length }}</strong> lead agents</span>
+        <span><strong>{{ traces().length }}</strong> events</span>
+        <span><strong>{{ findings().length }}</strong> findings</span>
+      </div>
+    </div>
+
+    <div class="execution-graph">
+      <div class="pipeline" aria-label="Review ingestion pipeline">
+        @for (trace of pipeline(); track trace.sequence; let last = $last) {
+          <div class="pipeline-step" [class]="'pipeline-step ' + trace.status">
+            <span class="node-dot" aria-hidden="true"></span>
+            <div><small>System</small><strong>{{ trace.stage }}</strong></div>
+          </div>
+          @if (!last) { <span class="flow-arrow" aria-hidden="true">→</span> }
+        }
+      </div>
+
+      <div class="coordinator-node">
+        <span class="coordinator-icon" aria-hidden="true">◇</span>
+        <div><small>LangGraph coordinator</small><strong>Parallel fan-out</strong></div>
+      </div>
+
+      <div class="agent-grid" aria-label="Parallel specialist agents">
+        @for (lane of agentLanes(); track lane.lead.stage) {
+          <article class="agent-lane" [class]="lane.lead.status">
+            <div class="lead-agent">
+              <div class="agent-title">
+                <span class="node-dot" aria-hidden="true"></span>
+                <div><small>Lead agent</small><h3>{{ lane.lead.stage }}</h3></div>
+              </div>
+              <span class="badge" [class]="'badge ' + lane.lead.status">{{ lane.lead.status }}</span>
+            </div>
+            <p class="agent-detail">{{ lane.lead.detail }}</p>
+            <div class="agent-metrics">
+              <span><strong>{{ lane.subagents.length }}</strong> spawned</span>
+              <span><strong>{{ lane.findingCount }}</strong> findings</span>
+            </div>
+
+            @if (lane.subagents.length) {
+              <div class="subagent-tree" aria-label="Spawned subagents">
+                @for (subagent of lane.subagents; track subagent.stage) {
+                  <div class="subagent" [class]="subagent.status">
+                    <span class="branch-line" aria-hidden="true"></span>
+                    <span class="node-dot" aria-hidden="true"></span>
+                    <div><small>Subagent</small><strong>{{ subagent.stage.split('.')[1] }}</strong></div>
+                    <span class="status-label">{{ subagent.status }}</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="no-subagents">No subagents spawned</div>
+            }
+          </article>
+        }
+      </div>
+
+      @if (publishStage(); as publish) {
+        <div class="publish-node" [class]="publish.status">
+          <span class="node-dot" aria-hidden="true"></span>
+          <div><small>Join + validation</small><strong>{{ publish.detail }}</strong></div>
+        </div>
+      }
+    </div>
+  </section>
+
   <div class="detail-grid">
-    <section class="panel"><div class="panel-heading"><h2>Verified findings</h2></div>
+    <section class="panel findings-panel"><div class="panel-heading"><h2>Verified findings</h2><span class="panel-count">{{ findings().length }}</span></div>
       @if (findings().length === 0) { <div class="empty-state">No verified findings.</div> }
-      @for (finding of findings(); track finding.path + ':' + finding.line + ':' + finding.title) {
-        <article class="finding"><div class="finding-heading"><span class="badge" [class]="'badge ' + finding.severity">{{ finding.severity }}</span><span>{{ finding.category }}</span><span>{{ finding.confidence | percent }}</span></div><h3>{{ finding.title }}</h3><code>{{ finding.path }}:{{ finding.line }}</code><p>{{ finding.comment }}</p>@if (finding.evidence.length) { <ul>@for (evidence of finding.evidence; track evidence) { <li>{{ evidence }}</li> }</ul> }</article>
+      @for (finding of findings(); track finding.path + ':' + finding.line + ':' + finding.title; let first = $first) {
+        <details class="finding" [open]="first">
+          <summary>
+            <div class="finding-summary">
+              <div class="finding-heading"><span class="badge" [class]="'badge ' + finding.severity">{{ finding.severity }}</span><span>{{ finding.category }}</span><span>{{ finding.confidence | percent }}</span></div>
+              <h3>{{ finding.title }}</h3>
+              <code>{{ finding.path }}:{{ finding.line }}</code>
+            </div>
+            <span class="collapse-control" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="finding-body">
+            <p>{{ finding.comment }}</p>
+            @if (finding.evidence.length) { <div class="evidence-block"><span>Evidence</span><ul>@for (evidence of finding.evidence; track evidence) { <li>{{ evidence }}</li> }</ul></div> }
+            @if (finding.suggested_fix) { <div class="suggested-fix"><span>Suggested fix</span><p>{{ finding.suggested_fix }}</p></div> }
+          </div>
+        </details>
       }
     </section>
-    <section class="panel"><div class="panel-heading"><h2>Agent execution trace</h2></div><ol class="trace-list">
+    <div class="right-column">
+      <section class="panel error-panel">
+        <div class="panel-heading"><h2>Execution errors</h2></div>
+        @if (executionErrors().length === 0) {
+          <div class="healthy-state"><span aria-hidden="true">✓</span><div><strong>No execution errors</strong><p>All selected agents completed without a recorded failure.</p></div></div>
+        } @else {
+          <ul class="error-list">@for (message of executionErrors(); track message) { <li>{{ message }}</li> }</ul>
+        }
+      </section>
+      <section class="panel"><div class="panel-heading"><h2>Event timeline</h2></div><ol class="trace-list">
       @for (trace of traces(); track trace.sequence) { <li><span class="trace-marker" [class]="trace.status"></span><div><strong>{{ trace.stage }}</strong><span class="badge" [class]="'badge ' + trace.status">{{ trace.status }}</span><p>{{ trace.detail }}</p><small>{{ trace.created_at | date:'mediumTime' }}</small></div></li> }
-    </ol></section>
+      </ol></section>
+    </div>
   </div>
 } }

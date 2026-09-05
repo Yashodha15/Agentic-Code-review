@@ -49,7 +49,7 @@ def create_app(
     ingestion = ReviewIngestionService(review_repository, job_publisher)
 
     app = FastAPI(
-        title="Aegis Review API",
+        title="Code Review API",
         version="0.1.0",
         description="GitHub ingestion and maintenance API for multi-agent reviews.",
     )

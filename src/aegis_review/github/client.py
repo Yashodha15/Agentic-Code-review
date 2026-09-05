@@ -26,10 +26,10 @@ MANIFEST_PATHS = (
 )
 
 
-def _review_event(errors: list[str]) -> str:
+def _review_event(errors: list[str], block_reasons: list[str] | None = None) -> str:
     """Fail closed when any selected review step did not complete."""
 
-    return "REQUEST_CHANGES" if errors else "COMMENT"
+    return "REQUEST_CHANGES" if errors or block_reasons else "COMMENT"
 
 
 @dataclass(frozen=True)
@@ -56,6 +56,8 @@ class GitHubReviewClient(Protocol):
         review: ReviewRecord,
         findings: list[ReviewFinding],
         errors: list[str],
+        *,
+        block_reasons: list[str] | None = None,
     ) -> None: ...
 
 
@@ -187,28 +189,31 @@ class HttpGitHubReviewClient:
         review: ReviewRecord,
         findings: list[ReviewFinding],
         errors: list[str],
+        *,
+        block_reasons: list[str] | None = None,
     ) -> None:
+        block_reasons = block_reasons or []
         comments = [
             {
                 "path": finding.path,
                 "line": finding.line,
                 "side": "RIGHT",
                 "body": (
-                    f"### Aegis · {finding.severity.value.title()} · {finding.title}\n\n"
+                    f"### Code Review · {finding.severity.value.title()} · {finding.title}\n\n"
                     f"{finding.comment}\n\nConfidence: {finding.confidence:.0%}"
                 ),
             }
             for finding in findings
         ]
-        body = f"Aegis completed review with {len(findings)} verified finding(s)."
-        if errors:
+        body = f"Code Review completed with {len(findings)} verified finding(s)."
+        if block_reasons:
             body += (
-                f" {len(errors)} specialist step(s) reported errors. "
-                "Review is incomplete; merge must remain blocked until a clean rerun."
+                f" {len(block_reasons)} policy condition(s) block merge. "
+                "Resolve them and push a new commit to rerun Code Review."
             )
         payload = {
             "commit_id": review.head_sha,
-            "event": _review_event(errors),
+            "event": _review_event(errors, block_reasons),
             "body": body,
             "comments": comments,
         }
@@ -221,6 +226,26 @@ class HttpGitHubReviewClient:
                 json=payload,
             )
             response.raise_for_status()
+
+            # A required check run is the authoritative branch-protection gate.
+            # Repository settings must require the check named "Code Review".
+            check_response = client.post(
+                f"{self._base_url}/repos/{review.repository}/check-runs",
+                headers=headers,
+                json={
+                    "name": "Code Review",
+                    "head_sha": review.head_sha,
+                    "status": "completed",
+                    "conclusion": "failure" if block_reasons else "success",
+                    "output": {
+                        "title": "Merge blocked" if block_reasons else "Review passed",
+                        "summary": "\n".join(block_reasons)
+                        if block_reasons
+                        else f"Code Review published {len(findings)} verified finding(s).",
+                    },
+                },
+            )
+            check_response.raise_for_status()
 
 
 class FakeGitHubReviewClient:
@@ -236,6 +261,7 @@ class FakeGitHubReviewClient:
         self.publish_error = publish_error
         self.fetched_reviews: list[str] = []
         self.published: list[tuple[ReviewRecord, list[ReviewFinding], list[str]]] = []
+        self.check_runs: list[dict[str, object]] = []
 
     def fetch_context(self, review: ReviewRecord) -> PullRequestContext:
         self.fetched_reviews.append(review.id)
@@ -246,6 +272,8 @@ class FakeGitHubReviewClient:
         review: ReviewRecord,
         findings: list[ReviewFinding],
         errors: list[str],
+        *,
+        block_reasons: list[str] | None = None,
     ) -> None:
         if self.publish_error is not None:
             raise self.publish_error
@@ -255,4 +283,11 @@ class FakeGitHubReviewClient:
                 [item.model_copy(deep=True) for item in findings],
                 list(errors),
             )
+        )
+        self.check_runs.append(
+            {
+                "review_id": review.id,
+                "conclusion": "failure" if block_reasons else "success",
+                "reasons": list(block_reasons or []),
+            }
         )

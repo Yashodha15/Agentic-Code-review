@@ -9,3 +9,7 @@ def test_clean_review_publishes_comment() -> None:
 
 def test_specialist_error_requests_changes() -> None:
     assert _review_event(["security: provider unavailable"]) == "REQUEST_CHANGES"
+
+
+def test_policy_block_requests_changes() -> None:
+    assert _review_event([], ["critical finding"]) == "REQUEST_CHANGES"

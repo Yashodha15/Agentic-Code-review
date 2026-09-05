@@ -20,6 +20,9 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.brand')?.textContent).toContain('Aegis Review');
+    expect(compiled.querySelector('.brand')?.textContent).toContain('Code Review');
+    const operationsLink = compiled.querySelector<HTMLAnchorElement>('a[href="/ops/"]');
+    expect(operationsLink?.textContent).toContain('Operations');
+    expect(operationsLink?.target).toBe('_blank');
   });
 });

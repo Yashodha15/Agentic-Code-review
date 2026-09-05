@@ -1,0 +1,75 @@
+services:
+  api:
+    build: .
+    command: ["python", "-m", "aegis_review.cli", "api", "--host", "0.0.0.0"]
+    env_file: .env
+    environment:
+      # The named volume is shared with the worker container.
+      AEGIS_DATABASE_PATH: /data/aegis.db
+    volumes:
+      - aegis-data:/data
+      - ./src/aegis_review:/app/src/aegis_review:ro
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["python", "-m", "aegis_review.cli", "worker"]
+    env_file: .env
+    environment:
+      AEGIS_DATABASE_PATH: /data/aegis.db
+      GITHUB_APP_PRIVATE_KEY_PATH: /run/secrets/github-app.pem
+    volumes:
+      - aegis-data:/data
+      - ./secrets:/run/secrets:ro
+      - ./src/aegis_review:/app/src/aegis_review:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  console:
+    build: .
+    command:
+      - streamlit
+      - run
+      - src/aegis_review/console/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --server.baseUrlPath=ops
+      - --browser.gatherUsageStats=false
+    environment:
+      # The console talks to the API over Docker's private network. Caddy still
+      # protects every browser connection with the dashboard login.
+      AEGIS_API_URL: http://api:8000
+    volumes:
+      # Mount console source independently so UI-only updates do not require
+      # rebuilding the full backend/agent dependency image.
+      - ./src/aegis_review/console:/app/src/aegis_review/console:ro
+    expose:
+      - "8501"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  gateway:
+    image: caddy:2-alpine
+    env_file: ./deploy/auth.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./apps/web/dist/aegis-console/browser:/srv/web:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - console
+    restart: unless-stopped
+
+volumes:
+  aegis-data:
+  caddy-data:
+  caddy-config:

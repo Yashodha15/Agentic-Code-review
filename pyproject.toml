@@ -21,6 +21,9 @@ api = [
     "PyJWT[crypto]>=2.10,<3",
     "uvicorn>=0.40,<1",
 ]
+console = [
+    "streamlit>=1.42,<2",
+]
 dev = [
     "httpx>=0.28,<1",
     "pytest>=8,<9",

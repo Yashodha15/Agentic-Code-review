@@ -1,0 +1,43 @@
+34-42-26-168.sslip.io {
+    encode gzip
+
+    # GitHub signs this endpoint, so it remains available without dashboard login.
+    handle /api/v1/github/webhooks {
+        reverse_proxy api:8000
+    }
+
+    # Health checks contain no maintenance or repository data.
+    handle /health {
+        reverse_proxy api:8000
+    }
+
+    # Protect every maintenance API endpoint before the SPA fallback is considered.
+    handle /api/* {
+        basic_auth {
+            {$AEGIS_ADMIN_USER} {$AEGIS_ADMIN_PASSWORD_HASH}
+        }
+
+        reverse_proxy api:8000
+    }
+
+    # Streamlit uses HTTP and WebSocket connections under its configured base
+    # path. Keeping the /ops prefix intact lets Streamlit generate valid URLs.
+    handle /ops* {
+        basic_auth {
+            {$AEGIS_ADMIN_USER} {$AEGIS_ADMIN_PASSWORD_HASH}
+        }
+
+        reverse_proxy console:8501
+    }
+
+    # Protect the maintenance UI and serve Angular's client-side routes.
+    handle {
+        basic_auth {
+            {$AEGIS_ADMIN_USER} {$AEGIS_ADMIN_PASSWORD_HASH}
+        }
+
+        root * /srv/web
+        try_files {path} /index.html
+        file_server
+    }
+}

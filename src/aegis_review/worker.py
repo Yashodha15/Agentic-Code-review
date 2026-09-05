@@ -9,6 +9,12 @@ from aegis_review.diff_parser import parse_unified_diff
 from aegis_review.github.client import GitHubReviewClient
 from aegis_review.graph import run_review
 from aegis_review.planning import build_review_plan
+from aegis_review.policy_enforcement import (
+    BudgetedReviewProvider,
+    blocking_reasons,
+    filter_ignored_diff,
+    runtime_limit,
+)
 from aegis_review.providers.base import ReviewModelProvider
 from aegis_review.storage.base import ReviewRepository
 from aegis_review.storage.policy import InMemoryPolicyStore, PolicyStore
@@ -50,19 +56,29 @@ class ReviewWorker:
         )
 
         try:
+            policy = self.policies.get()
             context = self.github.fetch_context(review)
-            parsed_diff = parse_unified_diff(context.diff_text)
+            review_diff = filter_ignored_diff(context.diff_text, policy.ignored_paths)
+            parsed_diff = parse_unified_diff(review_diff)
             snapshot = RepositorySnapshot(
                 changed_files=tuple(parsed_diff.changed_files),
                 manifests=context.manifests,
             )
             adapter_matches = self.adapters.detect(snapshot)
             plan = build_review_plan(parsed_diff.changed_files, adapter_matches)
-            policy = self.policies.get()
             assignments = []
             remaining_subagents = policy.limits.maximum_subagents
             for assignment in plan.assignments[: policy.limits.maximum_specialist_agents]:
-                selected_subagents = assignment.subagents[:remaining_subagents]
+                candidate_subagents = assignment.subagents
+                if not policy.allow_reproduction_tests:
+                    candidate_subagents = [
+                        name for name in candidate_subagents if name != "regression-tests"
+                    ]
+                selected_subagents = (
+                    candidate_subagents[:remaining_subagents]
+                    if policy.limits.maximum_delegation_depth >= 2
+                    else []
+                )
                 remaining_subagents -= len(selected_subagents)
                 assignments.append(
                     assignment.model_copy(update={"subagents": selected_subagents})
@@ -76,11 +92,13 @@ class ReviewWorker:
                 f"{len(plan.adapters)} adapter(s); risk={plan.risk_level.value}.",
             )
 
-            result = run_review(
-                diff_text=context.diff_text,
-                plan=plan,
-                provider=self.provider,
-            )
+            guarded_provider = BudgetedReviewProvider.from_policy(self.provider, policy)
+            with runtime_limit(policy.limits.maximum_runtime_seconds):
+                result = run_review(
+                    diff_text=review_diff,
+                    plan=plan,
+                    provider=guarded_provider,
+                )
             self._record_agent_traces(review_id, result)
             minimum = SEVERITY_ORDER[policy.minimum_severity.value]
             publication_findings = [
@@ -94,8 +112,12 @@ class ReviewWorker:
                 completed_agents=result["completed_agents"],
                 errors=result["errors"],
             )
+            reasons = blocking_reasons(policy, publication_findings, result["errors"])
             self.github.publish_review(
-                completed, publication_findings, result["errors"]
+                completed,
+                publication_findings,
+                result["errors"],
+                block_reasons=reasons,
             )
             self.repository.append_trace(
                 review_id,
