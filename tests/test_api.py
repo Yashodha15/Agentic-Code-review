@@ -156,6 +156,29 @@ def test_review_and_trace_endpoints_return_created_data() -> None:
     assert findings == []
 
 
+def test_review_event_stream_returns_live_snapshots() -> None:
+    client, _, _ = make_client()
+    receipt = post_payload(client, pull_request_payload()).json()
+
+    list_response = client.get("/api/v1/reviews/events?once=true")
+    detail_response = client.get(
+        f"/api/v1/reviews/{receipt['review_id']}/events?once=true"
+    )
+
+    assert list_response.headers["content-type"].startswith("text/event-stream")
+    assert "event: reviews" in list_response.text
+    assert '"pull_request_number":482' in list_response.text
+    assert detail_response.headers["content-type"].startswith("text/event-stream")
+    assert "event: review" in detail_response.text
+    assert '"stage":"webhook"' in detail_response.text
+
+
+def test_unknown_review_event_stream_returns_not_found() -> None:
+    client, _, _ = make_client()
+
+    assert client.get("/api/v1/reviews/missing/events").status_code == 404
+
+
 def test_unknown_review_returns_not_found() -> None:
     client, _, _ = make_client()
 

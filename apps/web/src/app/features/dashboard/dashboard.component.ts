@@ -25,5 +25,10 @@ export class DashboardComponent {
       next: reviews => { this.reviews.set(reviews); this.loading.set(false); },
       error: () => { this.error.set('The review API is unavailable.'); this.loading.set(false); }
     });
+    this.api.streamReviews().pipe(takeUntilDestroyed()).subscribe(reviews => {
+      this.reviews.set(reviews);
+      this.loading.set(false);
+      this.error.set('');
+    });
   }
 }

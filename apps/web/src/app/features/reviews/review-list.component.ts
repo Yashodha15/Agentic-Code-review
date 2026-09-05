@@ -21,5 +21,10 @@ export class ReviewListComponent {
       next: reviews => { this.reviews.set(reviews); this.loading.set(false); },
       error: () => { this.error.set('Unable to load reviews.'); this.loading.set(false); }
     });
+    this.api.streamReviews().pipe(takeUntilDestroyed()).subscribe(reviews => {
+      this.reviews.set(reviews);
+      this.loading.set(false);
+      this.error.set('');
+    });
   }
 }
