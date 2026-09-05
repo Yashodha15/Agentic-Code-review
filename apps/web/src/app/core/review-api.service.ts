@@ -1,11 +1,12 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { inject, Injectable, NgZone } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ReviewFinding, ReviewPolicy, ReviewRecord, ReviewSnapshot, ReviewTraceEvent } from './api.models';
 
 @Injectable({ providedIn: 'root' })
 export class ReviewApiService {
   private readonly baseUrl = '/api/v1';
+  private readonly zone = inject(NgZone);
 
   constructor(private readonly http: HttpClient) {}
 
@@ -48,9 +49,12 @@ export class ReviewApiService {
       const source = new EventSource(url);
       source.addEventListener(eventName, event => {
         try {
-          subscriber.next(JSON.parse((event as MessageEvent<string>).data) as T);
+          const payload = JSON.parse((event as MessageEvent<string>).data) as T;
+          // EventSource is a native browser API and is not consistently patched
+          // by Zone.js. Re-enter Angular explicitly so signals repaint at once.
+          this.zone.run(() => subscriber.next(payload));
         } catch (error) {
-          subscriber.error(error);
+          this.zone.run(() => subscriber.error(error));
           source.close();
         }
       });
