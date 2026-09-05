@@ -1,25 +1,43 @@
-<header class="page-heading">
-  <div><h1>Review operations</h1><p>Monitor review execution and verified findings.</p></div>
-  <a class="primary-action" routerLink="/reviews">View all reviews</a>
-</header>
-<section class="metrics" aria-label="Review summary">
-  <div class="metric"><span class="metric-label">Total reviews</span><div class="metric-value">{{ reviews().length }}</div></div>
-  <div class="metric"><span class="metric-label">Active reviews</span><div class="metric-value">{{ activeCount() }}</div></div>
-  <div class="metric"><span class="metric-label">Verified findings</span><div class="metric-value">{{ findingCount() }}</div></div>
-</section>
-<section class="panel">
-  <div class="panel-heading"><h2>Recent pull requests</h2></div>
-  @if (loading()) { <div class="loading-state">Loading reviews…</div> }
-  @else if (error()) { <div class="error-state">{{ error() }}</div> }
-  @else if (reviews().length === 0) { <div class="empty-state">No GitHub pull requests have been received yet.</div> }
-  @else {
-    <div class="review-list">
-      @for (review of reviews().slice(0, 6); track review.id) {
-        <a [routerLink]="['/reviews', review.id]">
-          <div><strong>{{ review.repository }} #{{ review.pull_request_number }}</strong><small>{{ review.created_at | date:'medium' }}</small></div>
-          <div class="review-result"><span>{{ review.finding_count }} findings</span><span class="badge" [class]="'badge ' + review.status">{{ review.status }}</span></div>
-        </a>
-      }
-    </div>
+<header class="command-bar">
+  <div><span class="eyebrow">Autonomous review workspace</span><h1>Code review, in motion.</h1><p>Watch every agent reason, delegate, verify, and publish in real time.</p></div>
+  <div class="command-actions"><span class="live-indicator"><i></i> Live</span><button class="notification-button" type="button" (click)="toggleNotifications()"><span>Notifications</span>@if (unreadCount()) { <b>{{ unreadCount() }}</b> }</button></div>
+  @if (notificationsOpen()) {
+    <aside class="notification-panel"><div class="notification-heading"><strong>Notifications</strong><button type="button" (click)="toggleNotifications()">×</button></div>
+      @if (!notifications().length) { <p class="quiet">Completed reviews will appear here.</p> }
+      @for (item of notifications(); track item.id) { <article><span>✓</span><div><strong>{{ item.title }}</strong><p>{{ item.detail }}</p><small>{{ item.createdAt | date:'shortTime' }}</small></div></article> }
+    </aside>
   }
-</section>
+</header>
+
+@if (toast(); as message) { <div class="toast" role="status"><span class="toast-icon">✓</span><div><strong>{{ message.title }}</strong><p>{{ message.detail }}</p></div><button type="button" (click)="dismissToast()">×</button></div> }
+
+@if (loading()) { <div class="page-loader"><span></span><p>Connecting to the review graph…</p></div> }
+@else if (error() && !currentReview()) { <div class="error-state">{{ error() }}</div> }
+@else {
+  <main class="flow-canvas">
+    <section class="overview-strip"><div><span>Total runs</span><strong>{{ reviews().length }}</strong></div><div><span>In progress</span><strong>{{ activeCount() }}</strong></div><div><span>Findings</span><strong>{{ findingCount() }}</strong></div><div><span>Completed</span><strong>{{ completedCount() }}</strong></div></section>
+    @if (currentReview(); as review) {
+      <section class="run-card" [class.is-running]="review.status === 'running' || review.status === 'queued'">
+        <div class="run-topline"><div class="run-identity"><span class="status-orb" [class]="'status-orb ' + review.status"></span><div><small>{{ review.status === 'running' ? 'LIVE REVIEW' : 'LATEST REVIEW' }}</small><h2>{{ review.repository }} <span>#{{ review.pull_request_number }}</span></h2></div></div><a [routerLink]="['/reviews', review.id]">Open full report ↗</a></div>
+        <div class="progress-copy"><div><strong>@if (activeTrace(); as trace) { {{ trace.stage }} is running } @else { {{ review.status }} }</strong><span>{{ activeTrace()?.detail || (review.status === 'completed' ? 'Review published successfully.' : 'Preparing the agent graph…') }}</span></div><b>{{ progress() }}%</b></div>
+        <div class="progress-track"><i [style.width.%]="progress()"></i></div>
+        <div class="flow-line"><div class="system-node complete"><i></i><span>Webhook</span></div><em></em><div class="system-node" [class.active]="review.status === 'queued'"><i></i><span>Queue</span></div><em></em><div class="system-node" [class.active]="review.status === 'running'"><i></i><span>Orchestrate</span></div><em></em><div class="system-node" [class.complete]="review.status === 'completed'"><i></i><span>Publish</span></div></div>
+        <div class="agent-section-heading"><div><span>Parallel execution</span><strong>{{ agents().length }} specialist agents</strong></div><small>LangGraph coordinator</small></div>
+        @if (!agents().length && ['queued', 'running'].includes(review.status)) { <div class="agent-skeletons">@for (item of [1,2,3]; track item) { <div><i></i><span></span><span></span></div> }</div> }
+        @else { <div class="agent-river">@for (agent of agents(); track agent.name) {
+          <article class="agent-card" [class]="'agent-card ' + agent.status"><div class="agent-card-top"><span class="agent-glyph">{{ agent.name.slice(0, 1).toUpperCase() }}</span><div><small>Lead agent</small><strong>{{ agent.name }}</strong></div><span class="agent-state"><i></i>{{ agent.status }}</span></div><p>{{ agent.detail }}</p>
+            @if (agent.subagents.length) { <div class="subagent-list">@for (subagent of agent.subagents; track subagent.stage) { <div><span class="branch">↳</span><i [class]="subagent.status"></i><strong>{{ subagent.stage.split('.')[1] }}</strong><small>{{ subagent.status }}</small></div> }</div> }
+            @else { <div class="waiting-subagent"><span></span>No delegated tasks</div> }
+          </article> }</div> }
+      </section>
+      <section class="insight-row">
+        <div class="findings-preview"><div class="section-title"><div><span>Verified output</span><h2>Findings</h2></div><b>{{ currentFindings().length }}</b></div>
+          @if (!currentFindings().length) { <div class="clean-state"><span>✓</span><div><strong>No verified findings yet</strong><p>Accepted findings will appear here during the run.</p></div></div> }
+          @for (finding of currentFindings().slice(0, 4); track finding.path + finding.line + finding.title) { <article class="finding-row"><span [class]="'severity ' + finding.severity">{{ finding.severity }}</span><div><strong>{{ finding.title }}</strong><code>{{ finding.path }}:{{ finding.line }}</code></div><span>→</span></article> }
+        </div>
+        <div class="activity-panel"><div class="section-title"><div><span>Streaming now</span><h2>Recent activity</h2></div><i class="pulse"></i></div><ol>@for (trace of currentTraces().slice(-6).reverse(); track trace.sequence) { <li><i [class]="trace.status"></i><div><strong>{{ trace.stage }}</strong><p>{{ trace.detail }}</p></div><time>{{ trace.created_at | date:'shortTime' }}</time></li> }</ol></div>
+      </section>
+    } @else { <section class="empty-workspace"><span>⌁</span><h2>Your review stream is ready</h2><p>Open or update a pull request and its agent graph will appear here automatically.</p></section> }
+    <section class="history-section"><div class="section-title"><div><span>Workspace history</span><h2>Recent reviews</h2></div><a routerLink="/reviews">View all →</a></div><div class="history-list">@for (review of reviews().slice(0, 5); track review.id) { <a [routerLink]="['/reviews', review.id]"><span class="history-status" [class]="review.status"></span><div><strong>{{ review.repository }} #{{ review.pull_request_number }}</strong><small>{{ review.updated_at | date:'medium' }}</small></div><span>{{ review.finding_count }} findings</span><b>{{ review.status }}</b><i>→</i></a> }</div></section>
+  </main>
+}

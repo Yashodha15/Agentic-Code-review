@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   color: #e7edf7;
-  background: #080c14;
+  background: #070707;
   color-scheme: dark;
   --app-bg: #080c14;
   --surface: #101722;
@@ -19,7 +19,7 @@
   --danger: #fb7185;
 }
 * { box-sizing: border-box; }
-body { margin: 0; color: var(--text); background: radial-gradient(circle at 70% -20%, #172747 0%, var(--app-bg) 38%); }
+body { margin: 0; color: var(--text); background: radial-gradient(circle at 65% -20%, #1b1b1b 0%, var(--app-bg) 34%); }
 button, input, select { font: inherit; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 6px; font-size: 26px; }

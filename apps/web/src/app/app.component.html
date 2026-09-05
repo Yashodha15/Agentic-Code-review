@@ -1,22 +1,22 @@
 <div class="app-shell">
   <aside class="sidebar">
     <a class="brand" routerLink="/" aria-label="Code Review dashboard">
-      <span class="brand-mark">C</span><span>Code Review</span>
+      <span class="brand-mark">CR</span><span>Code Review</span>
     </a>
-    <div class="organization"><span>Organization</span><strong>Local workspace</strong></div>
+    <div class="organization"><span>Workspace</span><strong>AI review cloud</strong><i></i></div>
     <nav aria-label="Primary navigation">
-      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">▦ Dashboard</a>
-      <a routerLink="/reviews" routerLinkActive="active">⑂ Reviews</a>
-      <a routerLink="/settings" routerLinkActive="active">⚙ Settings</a>
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><span>01</span> Live workspace</a>
+      <a routerLink="/reviews" routerLinkActive="active"><span>02</span> Review archive</a>
+      <a routerLink="/settings" routerLinkActive="active"><span>03</span> Policy</a>
       <!-- Streamlit is served by the production gateway, outside Angular's router. -->
       <a class="external-link" href="/ops/" target="_blank" rel="noopener">
-        ◈ Operations <span aria-hidden="true">↗</span>
+        <span>04</span> Operations <b aria-hidden="true">↗</b>
       </a>
     </nav>
-    <div class="connection-state"><span></span> API connected locally</div>
+    <div class="connection-state"><span></span><div><strong>System online</strong><small>SSE connection active</small></div></div>
   </aside>
   <div class="workspace">
-    <header class="topbar"><span>Development environment</span><strong aria-label="Current user">GR</strong></header>
+    <header class="topbar"><span>Multi-agent review system</span><div><i></i> Production<strong aria-label="Current user">YS</strong></div></header>
     <main><router-outlet /></main>
   </div>
 </div>
