@@ -36,3 +36,92 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm audit --omit=dev
+
+  deploy:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Package release
+        run: tar --exclude=.git -czf "$RUNNER_TEMP/release-${GITHUB_SHA}.tar.gz" .
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            "$RUNNER_TEMP/release-${GITHUB_SHA}.tar.gz" \
+            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/aegis-${GITHUB_SHA}.tar.gz"
+
+      - name: Build and restart production
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "RELEASE_SHA='${GITHUB_SHA}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          release_dir="/tmp/aegis-${RELEASE_SHA}"
+          archive="/tmp/aegis-${RELEASE_SHA}.tar.gz"
+          target="/home/ganeshramani1992/aegis"
+
+          sudo rm -rf "$release_dir"
+          sudo mkdir -p "$release_dir"
+          sudo tar -xzf "$archive" -C "$release_dir"
+
+          # Replace tracked application files while retaining production-only
+          # credentials, environment files, certificates, and Docker volumes.
+          sudo rm -rf "$target/apps" "$target/src" "$target/tests" "$target/.github"
+          sudo cp -a \
+            "$release_dir/apps" \
+            "$release_dir/src" \
+            "$release_dir/tests" \
+            "$release_dir/.github" \
+            "$target/"
+          sudo cp \
+            "$release_dir/.dockerignore" \
+            "$release_dir/.env.example" \
+            "$release_dir/.gitignore" \
+            "$release_dir/Dockerfile" \
+            "$release_dir/README.md" \
+            "$release_dir/docker-compose.prod.yml" \
+            "$release_dir/docker-compose.yml" \
+            "$release_dir/pyproject.toml" \
+            "$release_dir/requirements.txt" \
+            "$target/"
+          sudo cp "$release_dir/deploy/Caddyfile" "$target/deploy/Caddyfile"
+          printf '%s\n' "$RELEASE_SHA" | sudo tee "$target/RELEASE_SHA" >/dev/null
+
+          cd "$target/apps/web"
+          sudo docker run --rm -v "$PWD:/app" -w /app node:24.19-alpine \
+            sh -c "npm ci && npm run build"
+
+          cd "$target"
+          sudo docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+          sudo docker compose -f docker-compose.prod.yml ps
+
+          sudo rm -rf "$release_dir" "$archive"
+          REMOTE
+
+      - name: Verify production
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: curl --fail --retry 12 --retry-delay 5 --insecure "https://${DEPLOY_HOST}/health"
