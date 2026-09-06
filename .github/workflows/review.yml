@@ -116,6 +116,9 @@ jobs:
 
           cd "$target"
           sudo docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+          # Refresh Caddy's resolved upstream addresses after application
+          # containers are recreated with new Docker network addresses.
+          sudo docker compose -f docker-compose.prod.yml restart gateway
           sudo docker compose -f docker-compose.prod.yml ps
 
           sudo rm -rf "$release_dir" "$archive"
@@ -123,5 +126,5 @@ jobs:
 
       - name: Verify production
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        run: curl --fail --retry 12 --retry-delay 5 --insecure "https://${DEPLOY_HOST}/health"
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+        run: curl --fail --retry 12 --retry-delay 5 "${DEPLOY_URL}/health"
