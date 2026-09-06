@@ -1,0 +1,23 @@
+<a class="back" routerLink="/">← Back to workspace</a>
+@if(loading()){<div class="state">Loading review…</div>}@else if(error()){<div class="state">{{error()}}</div>}@else if(review();as item){
+<header class="hero"><div><span>Pull request review</span><h1>{{item.repository}} <b>#{{item.pull_request_number}}</b></h1><p>Commit {{item.head_sha.slice(0,10)}} · {{item.updated_at|date:'medium'}}</p></div><ui-status-pill [status]="item.status">{{item.status}}</ui-status-pill></header>
+<div class="review-layout">
+  <main class="review-canvas"><ui-surface-card eyebrow="Orchestration" title="Agent execution graph"><div actions class="summary"><span class="count-pill agent-count"><b>{{leads().length}}</b> Agents</span><span class="count-pill subagent-count"><b>{{subagentCount()}}</b> Subagents</span></div>
+    <section class="graph" aria-label="Agent execution graph">
+      <div class="system-flow">@for(trace of pipeline();track trace.sequence;let last=$last){<div class="system-step" [class]="trace.status"><i></i><span>{{trace.stage}}</span></div>@if(!last){<span class="flow-line">→</span>}}</div>
+      <div class="coordinator"><span>LangGraph coordinator</span><strong>Parallel fan-out</strong></div>
+      <div class="lane-label"><span>Parallel agent lane</span><b>{{leads().length}} specialists</b></div>
+      <div class="agent-tree">@for(lead of leads();track lead.stage;let index=$index){<div [class]="'agent-branch '+lead.status"><div class="branch-line"></div><span class="branch-node">{{index+1}}</span><review-agent-card [lead]="lead" [children]="children(lead.stage)"/></div>}</div>
+    </section>
+  </ui-surface-card></main>
+  <aside class="insights-panel">
+    <div class="tab-bar" role="tablist" aria-label="Review insights"><button type="button" role="tab" [class.active]="activeTab()==='findings'" [attr.aria-selected]="activeTab()==='findings'" (click)="setTab('findings')">Findings <span>{{findings().length}}</span></button><button type="button" role="tab" [class.active]="activeTab()==='timeline'" [attr.aria-selected]="activeTab()==='timeline'" (click)="setTab('timeline')">Event timeline <span>{{traces().length}}</span></button></div>
+    <div class="tab-content">@if(activeTab()==='findings'){
+      <div class="panel-heading"><span>Verified output</span><h2>Review findings</h2></div>
+      @if(!findings().length){<div class="state">No verified findings.</div>}
+      @for(finding of findings();track finding.path+finding.line){<details class="finding"><summary><div class="finding-title"><ui-status-pill [status]="finding.severity">{{finding.severity}}</ui-status-pill><strong>{{finding.title}}</strong><code>{{finding.path}}:{{finding.line}}</code></div><span>⌄</span></summary><section><p>{{finding.comment}}</p>@if(finding.suggested_fix){<aside><b>Suggested fix</b><p>{{finding.suggested_fix}}</p></aside>}</section></details>}
+    }@else{
+      <div class="panel-heading"><span>Review history</span><h2>Event timeline</h2></div><ol class="timeline">@for(trace of traces();track trace.sequence){<li><i [class]="trace.status"></i><div><strong>{{trace.stage}}</strong><small>{{trace.detail}}</small></div><ui-status-pill [status]="trace.status">{{trace.status}}</ui-status-pill></li>}</ol>
+    }</div>
+  </aside>
+</div>}

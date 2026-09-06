@@ -1,24 +1,8 @@
 {
   "redirects": [
-    {
-      "source": "/",
-      "destination": "https://34-42-26-168.sslip.io/",
-      "permanent": false
-    },
-    {
-      "source": "/reviews",
-      "destination": "https://34-42-26-168.sslip.io/reviews",
-      "permanent": false
-    },
-    {
-      "source": "/reviews/:path*",
-      "destination": "https://34-42-26-168.sslip.io/reviews/:path*",
-      "permanent": false
-    },
-    {
-      "source": "/settings",
-      "destination": "https://34-42-26-168.sslip.io/settings",
-      "permanent": false
-    }
+    {"source": "/", "destination": "https://34-42-26-168.sslip.io/", "permanent": false},
+    {"source": "/reviews", "destination": "https://34-42-26-168.sslip.io/reviews", "permanent": false},
+    {"source": "/reviews/:path*", "destination": "https://34-42-26-168.sslip.io/reviews/:path*", "permanent": false},
+    {"source": "/settings", "destination": "https://34-42-26-168.sslip.io/settings", "permanent": false}
   ]
 }

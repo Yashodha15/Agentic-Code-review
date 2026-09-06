@@ -1,6 +1,4 @@
 34-42-26-168.sslip.io {
-    encode gzip
-
     # GitHub signs this endpoint, so it remains available without dashboard login.
     handle /api/v1/github/webhooks {
         reverse_proxy api:8000
@@ -9,6 +7,23 @@
     # Health checks contain no maintenance or repository data.
     handle /health {
         reverse_proxy api:8000
+    }
+
+    # SSE must bypass response compression and proxy buffering so every agent
+    # update reaches Angular as soon as it is written by the API.
+    @review_events path /api/v1/reviews/events /api/v1/reviews/*/events
+    handle @review_events {
+        basic_auth {
+            {$AEGIS_ADMIN_USER} {$AEGIS_ADMIN_PASSWORD_HASH}
+        }
+
+        header {
+            Cache-Control "no-cache, no-transform"
+            X-Accel-Buffering "no"
+        }
+        reverse_proxy api:8000 {
+            flush_interval -1
+        }
     }
 
     # Protect every maintenance API endpoint before the SPA fallback is considered.
@@ -36,6 +51,7 @@
             {$AEGIS_ADMIN_USER} {$AEGIS_ADMIN_PASSWORD_HASH}
         }
 
+        encode gzip
         root * /srv/web
         try_files {path} /index.html
         file_server
