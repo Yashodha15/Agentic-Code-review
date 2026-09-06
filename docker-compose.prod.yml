@@ -1,6 +1,7 @@
 services:
   api:
     build: .
+    image: aegis-app:latest
     command: ["python", "-m", "aegis_review.cli", "api", "--host", "0.0.0.0"]
     env_file: .env
     environment:
@@ -14,7 +15,7 @@ services:
     restart: unless-stopped
 
   worker:
-    build: .
+    image: aegis-app:latest
     command: ["python", "-m", "aegis_review.cli", "worker"]
     env_file: .env
     environment:
@@ -29,7 +30,7 @@ services:
     restart: unless-stopped
 
   console:
-    build: .
+    image: aegis-app:latest
     command:
       - streamlit
       - run
