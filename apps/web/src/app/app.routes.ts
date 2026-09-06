@@ -1,13 +1,1 @@
-import { Routes } from '@angular/router';
-import { DashboardComponent } from './features/dashboard/dashboard.component';
-import { ReviewDetailComponent } from './features/reviews/review-detail.component';
-import { ReviewListComponent } from './features/reviews/review-list.component';
-import { SettingsComponent } from './features/settings/settings.component';
-
-export const routes: Routes = [
-  { path: '', component: DashboardComponent, title: 'Dashboard · Code Review' },
-  { path: 'reviews', component: ReviewListComponent, title: 'Reviews · Code Review' },
-  { path: 'reviews/:id', component: ReviewDetailComponent, title: 'Review · Code Review' },
-  { path: 'settings', component: SettingsComponent, title: 'Settings · Code Review' },
-  { path: '**', redirectTo: '' }
-];
+import { Routes } from '@angular/router';import { WorkspaceComponent } from './pages/workspace/workspace.component';import { ArchiveComponent } from './pages/archive/archive.component';import { ReviewDetailComponent } from './pages/review-detail/review-detail.component';export const routes:Routes=[{path:'',component:WorkspaceComponent,title:'Workspace · Code Review'},{path:'reviews',component:ArchiveComponent,title:'Reviews · Code Review'},{path:'reviews/:id',component:ReviewDetailComponent,title:'Review · Code Review'},{path:'**',redirectTo:''}];

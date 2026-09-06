@@ -1,10 +1,1 @@
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-
-@Component({
-  selector: 'app-root',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
-})
-export class AppComponent {}
+import { Component } from '@angular/core';import { RouterOutlet } from '@angular/router';import { AppHeaderComponent } from './ui/app-header/app-header.component';import { NotificationStackComponent } from './ui/notification-stack/notification-stack.component';@Component({selector:'app-root',standalone:true,imports:[RouterOutlet,AppHeaderComponent,NotificationStackComponent],template:`<ui-app-header/><main><router-outlet/></main><ui-notification-stack/>`,styles:`main{max-width:1480px;margin:auto;padding:32px clamp(18px,4vw,64px) 64px}`})export class AppComponent{}

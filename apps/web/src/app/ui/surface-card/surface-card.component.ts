@@ -1,0 +1,2 @@
+import { Component, input } from '@angular/core';
+@Component({selector:'ui-surface-card',standalone:true,template:`<section class="surface"><header><div><span>{{eyebrow()}}</span><h2>{{title()}}</h2></div><ng-content select="[actions]"/></header><ng-content/></section>`,styleUrl:'./surface-card.component.scss'}) export class SurfaceCardComponent{readonly eyebrow=input('');readonly title=input.required<string>()}
